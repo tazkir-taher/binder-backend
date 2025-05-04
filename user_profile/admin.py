@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import Profile, Interest, UserInterest
+from .models import Profile, InterestCategory, UserInterest
 
 class UserInterestInline(admin.TabularInline):
     model = UserInterest
@@ -23,7 +23,9 @@ class ProfileAdmin(UserAdmin):
     )
     inlines = [UserInterestInline]
 
-@admin.register(Interest)
-class InterestAdmin(admin.ModelAdmin):
-    list_display = ('name',)
+@admin.register(InterestCategory)
+class InterestCategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'category')
+    list_filter = ('category',)
     search_fields = ('name',)
+    ordering = ('category', 'name')
