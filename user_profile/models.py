@@ -1,7 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
-# Custom user model
 class Profile(AbstractUser):
     class Gender(models.TextChoices):
         MALE = 'male', 'Male'
@@ -47,25 +46,20 @@ class Profile(AbstractUser):
         PESCATARIAN = 'pescatarian', 'Pescatarian'
         KETO = 'keto', 'Keto'
 
-    # Core Fields
     bio = models.TextField(blank=True)
     birth_date = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=10, choices=Gender.choices)
     location = models.CharField(max_length=255, blank=True)
     
-    # Choice-based Fields
     mbti = models.CharField(max_length=4, choices=MBTI.choices, blank=True, null=True)
     zodiac_sign = models.CharField(max_length=12, choices=Zodiac.choices, blank=True, null=True)
     dietary_preference = models.CharField(max_length=12, choices=Diet.choices, blank=True, null=True)
 
-    # Corrected Relationship Field — note the model name!
     interests = models.ManyToManyField(
-        'InterestCategory',  # ✅ FIXED this from 'Interest'
+        'InterestCategory',
         through='UserInterest',
         related_name='profiles'
     )
-
-# The actual interest categories
 class InterestCategory(models.Model):
     class Category(models.TextChoices):
         HOBBY = 'hobby', 'Hobby'
@@ -83,11 +77,9 @@ class InterestCategory(models.Model):
 
     def __str__(self):
         return f"{self.get_category_display()}: {self.name}"
-
-# Junction table linking users and interests
 class UserInterest(models.Model):
-    user = models.ForeignKey(Profile, on_delete=models.CASCADE)               # ✅ Correct FK
-    interest = models.ForeignKey(InterestCategory, on_delete=models.CASCADE)  # ✅ Correct FK
+    user = models.ForeignKey(Profile, on_delete=models.CASCADE)
+    interest = models.ForeignKey(InterestCategory, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
