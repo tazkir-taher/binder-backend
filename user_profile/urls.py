@@ -1,6 +1,6 @@
 from django.urls import path
-from .views import ProfileDetailView
+from .views import dashboard
 
 urlpatterns = [
-    path('user_profile/', ProfileDetailView.as_view(), name='profile-detail'),
+    path('dashboard/', dashboard, name='user-dashboard'),
 ]

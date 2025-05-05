@@ -1,65 +1,100 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser
 
-class Profile(AbstractUser):
+class Profile(models.Model):
+    user = models.OneToOneField('authentication.Dater', on_delete=models.CASCADE, related_name='profile', null=True, blank=True)
+
     class Gender(models.TextChoices):
         MALE = 'male', 'Male'
         FEMALE = 'female', 'Female'
         OTHER = 'other', 'Other'
-    
-    class MBTI(models.TextChoices):
-        INTJ = 'INTJ', 'INTJ - Architect'
-        INTP = 'INTP', 'INTP - Logician'
-        ENTJ = 'ENTJ', 'ENTJ - Commander'
-        ENTP = 'ENTP', 'ENTP - Debater'
-        INFJ = 'INFJ', 'INFJ - Advocate'
-        INFP = 'INFP', 'INFP - Mediator'
-        ENFJ = 'ENFJ', 'ENFJ - Protagonist'
-        ENFP = 'ENFP', 'ENFP - Campaigner'
-        ISTJ = 'ISTJ', 'ISTJ - Logistician'
-        ISFJ = 'ISFJ', 'ISFJ - Defender'
-        ESTJ = 'ESTJ', 'ESTJ - Executive'
-        ESFJ = 'ESFJ', 'ESFJ - Consul'
-        ISTP = 'ISTP', 'ISTP - Virtuoso'
-        ISFP = 'ISFP', 'ISFP - Adventurer'
-        ESTP = 'ESTP', 'ESTP - Entrepreneur'
-        ESFP = 'ESFP', 'ESFP - Entertainer'
 
-    class Zodiac(models.TextChoices):
-        ARIES = 'aries', '♈ Aries'
-        TAURUS = 'taurus', '♉ Taurus'
-        GEMINI = 'gemini', '♊ Gemini'
-        CANCER = 'cancer', '♋ Cancer'
-        LEO = 'leo', '♌ Leo'
-        VIRGO = 'virgo', '♍ Virgo'
-        LIBRA = 'libra', '♎ Libra'
-        SCORPIO = 'scorpio', '♏ Scorpio'
-        SAGITTARIUS = 'sagittarius', '♐ Sagittarius'
-        CAPRICORN = 'capricorn', '♑ Capricorn'
-        AQUARIUS = 'aquarius', '♒ Aquarius'
-        PISCES = 'pisces', '♓ Pisces'
+    class Height(models.TextChoices):
+        _4_0 = '4_0', "4'0"
+        _4_1 = '4_1', "4'1"
+        _7_0 = '7_0', "7'0"
 
-    class Diet(models.TextChoices):
-        VEGETARIAN = 'vegetarian', 'Vegetarian'
-        VEGAN = 'vegan', 'Vegan'
-        OMNIVORE = 'omnivore', 'Omnivore'
-        PESCATARIAN = 'pescatarian', 'Pescatarian'
-        KETO = 'keto', 'Keto'
+    class Lifestyle(models.TextChoices):
+        DRINKING = 'drinking', 'Drinking'
+        SMOKING = 'smoking', 'Smoking'
+        HAVE_KIDS = 'have_kids', 'Have Kids'
+        WANT_KIDS = 'want_kids', 'Want Kids'
+        RELIGION = 'religion', 'Religion'
+        POLITICAL_VIEWS = 'political_views', 'Political Views'
+        CAUSES = 'causes', 'Causes & Communities'
 
+    class Quality(models.TextChoices):
+        KINDNESS = 'kindness', 'Kindness'
+        HUMOR = 'humor', 'Humor'
+        HONESTY = 'honesty', 'Honesty'
+
+    class RelationshipGoal(models.TextChoices):
+        DATING = 'dating', 'Dating'
+        BFF = 'bff', 'BFF'
+
+    username = models.CharField(max_length=150, unique=True)
+    email = models.EmailField(unique=True)
     bio = models.TextField(blank=True)
     birth_date = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=10, choices=Gender.choices)
     location = models.CharField(max_length=255, blank=True)
-    
-    mbti = models.CharField(max_length=4, choices=MBTI.choices, blank=True, null=True)
-    zodiac_sign = models.CharField(max_length=12, choices=Zodiac.choices, blank=True, null=True)
-    dietary_preference = models.CharField(max_length=12, choices=Diet.choices, blank=True, null=True)
 
+    lifestyle = models.CharField(
+        max_length=20,
+        choices=Lifestyle.choices,
+        blank=True,
+        null=True
+    )
+    height = models.CharField(
+        max_length=4,
+        choices=Height.choices,
+        blank=True,
+        null=True
+    )
+    qualities = models.ManyToManyField(
+        'ProfileQuality',
+        through='UserQuality',
+        related_name='profiles'
+    )
     interests = models.ManyToManyField(
         'InterestCategory',
         through='UserInterest',
         related_name='profiles'
     )
+    relationship_goal = models.CharField(
+        max_length=10,
+        choices=RelationshipGoal.choices,
+        blank=True,
+        null=True
+    )
+    hoping_for = models.ManyToManyField(
+        'ProfileQuality',
+        through='HopingFor',
+        related_name='hoping_profiles'
+    )
+
+
+class ProfileQuality(models.Model):
+    class Meta:
+        verbose_name = 'Quality'
+        verbose_name_plural = 'Qualities'
+
+    name = models.CharField(max_length=100)
+    choice = models.CharField(max_length=20, choices=Profile.Quality.choices)
+
+class UserQuality(models.Model):
+    user = models.ForeignKey(Profile, on_delete=models.CASCADE)
+    quality = models.ForeignKey(ProfileQuality, on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ('user', 'quality')
+
+class HopingFor(models.Model):
+    user = models.ForeignKey(Profile, on_delete=models.CASCADE)
+    quality = models.ForeignKey(ProfileQuality, on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ('user', 'quality')
+
 class InterestCategory(models.Model):
     class Category(models.TextChoices):
         HOBBY = 'hobby', 'Hobby'
@@ -77,6 +112,7 @@ class InterestCategory(models.Model):
 
     def __str__(self):
         return f"{self.get_category_display()}: {self.name}"
+
 class UserInterest(models.Model):
     user = models.ForeignKey(Profile, on_delete=models.CASCADE)
     interest = models.ForeignKey(InterestCategory, on_delete=models.CASCADE)
