@@ -1,11 +1,11 @@
 from datetime import date
+from django.contrib.auth import authenticate
 from rest_framework import status
-from rest_framework.decorators    import api_view, permission_classes
-from rest_framework.permissions   import AllowAny
-from rest_framework.response      import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-
-from .models      import Dater
+from .models import Dater
 from .serializers import DaterRegistrationSerializer
 from user_profile.models import Profile
 
@@ -13,13 +13,15 @@ from user_profile.models import Profile
 @permission_classes([AllowAny])
 def register(request):
     data = request.data
-    pw  = data.get('password')
+    pw = data.get('password')
     pw2 = data.get('password2')
+    
     if not pw or not pw2:
         return Response(
             {"detail": "Both password and password2 are required."},
             status=status.HTTP_400_BAD_REQUEST
         )
+    
     if pw != pw2:
         return Response(
             {"password2": "Passwords do not match."},
@@ -52,14 +54,63 @@ def register(request):
     Profile.objects.create(user=user)
 
     refresh = RefreshToken.for_user(user)
-    tokens  = {
+    tokens = {
         'refresh': str(refresh),
-        'access':  str(refresh.access_token),
+        'access': str(refresh.access_token),
     }
 
     out_serializer = DaterRegistrationSerializer(user)
     return Response({
         "message": "Registration successful.",
-        "user":    out_serializer.data,
-        "tokens":  tokens,
+        "user": out_serializer.data,
+        "tokens": tokens,
     }, status=status.HTTP_201_CREATED)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def login_view(request):
+    username = request.data.get('username')
+    password = request.data.get('password')
+
+    if not username or not password:
+        return Response(
+            {"detail": "Username and password are required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    user = authenticate(request, username=username, password=password)
+
+    if user is None:
+        return Response(
+            {"detail": "Invalid credentials."},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    refresh = RefreshToken.for_user(user)
+    tokens = {
+        'refresh': str(refresh),
+        'access': str(refresh.access_token),
+    }
+
+    return Response({
+        "message": "Login successful.",
+        "tokens": tokens
+    }, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout_view(request):
+    try:
+        refresh_token = request.data["refresh"]
+        token = RefreshToken(refresh_token)
+        token.blacklist()  # <--- This handles blacklisting internally
+
+        return Response(
+            {"message": "Logout successful."}, 
+            status=status.HTTP_205_RESET_CONTENT
+        )
+    except Exception as e:
+        return Response(
+            {"detail": "Invalid token or already blacklisted."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
