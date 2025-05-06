@@ -103,7 +103,7 @@ def logout_view(request):
     try:
         refresh_token = request.data["refresh"]
         token = RefreshToken(refresh_token)
-        token.blacklist()  # <--- This handles blacklisting internally
+        token.blacklist()
 
         return Response(
             {"message": "Logout successful."}, 
