@@ -1,18 +1,20 @@
-# views.py
+# authentication/views.py
+
 from datetime import date
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
+from rest_framework.decorators    import api_view, permission_classes
+from rest_framework.permissions   import AllowAny
+from rest_framework.response      import Response
+from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Dater
+from .models      import Dater
 from .serializers import DaterRegistrationSerializer
+from user_profile.models import Profile     # ← import here
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register(request):
     data = request.data
-
     pw  = data.get('password')
     pw2 = data.get('password2')
     if not pw or not pw2:
@@ -41,7 +43,7 @@ def register(request):
                 {"detail": "You must be at least 18 years old to register."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-    
+
     user_data = serializer.validated_data
     user_data.pop('password2')
     password = user_data.pop('password')
@@ -49,8 +51,19 @@ def register(request):
     user.set_password(password)
     user.save()
 
+    # ── HERE: manually create the Profile ──
+    Profile.objects.create(user=user)
+
+    # issue JWT tokens
+    refresh = RefreshToken.for_user(user)
+    tokens  = {
+        'refresh': str(refresh),
+        'access':  str(refresh.access_token),
+    }
+
     out_serializer = DaterRegistrationSerializer(user)
     return Response({
         "message": "Registration successful.",
-        "user":    out_serializer.data
+        "user":    out_serializer.data,
+        "tokens":  tokens,
     }, status=status.HTTP_201_CREATED)

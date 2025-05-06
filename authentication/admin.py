@@ -1,3 +1,11 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+from .models import Dater
 
-# Register your models here.
+@admin.register(Dater)
+class DaterAdmin(UserAdmin):
+    model = Dater
+    list_display = ('username', 'email', 'first_name', 'last_name', 'gender', 'birth_date', 'is_staff')
+    fieldsets = UserAdmin.fieldsets + (
+        ("Additional Info", {'fields': ('gender', 'birth_date')}),
+    )
