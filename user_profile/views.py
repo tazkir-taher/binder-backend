@@ -22,7 +22,6 @@ def profile_view(request):
         }
         return Response(data, status=status.HTTP_200_OK)
 
-    # POST: update the profile (partial)
     serializer = ProfileSerializer(profile, data=request.data, partial=True)
     if serializer.is_valid():
         serializer.save()

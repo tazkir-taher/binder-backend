@@ -1,5 +1,3 @@
-# authentication/views.py
-
 from datetime import date
 from rest_framework import status
 from rest_framework.decorators    import api_view, permission_classes
@@ -9,7 +7,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models      import Dater
 from .serializers import DaterRegistrationSerializer
-from user_profile.models import Profile     # ← import here
+from user_profile.models import Profile
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -51,10 +49,8 @@ def register(request):
     user.set_password(password)
     user.save()
 
-    # ── HERE: manually create the Profile ──
     Profile.objects.create(user=user)
 
-    # issue JWT tokens
     refresh = RefreshToken.for_user(user)
     tokens  = {
         'refresh': str(refresh),
