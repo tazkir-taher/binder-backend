@@ -18,6 +18,7 @@ class Dater(AbstractUser):
     default=Gender.OTHER,
     )
 
+
     @property
     def age(self):
         if not self.birth_date:
@@ -26,3 +27,7 @@ class Dater(AbstractUser):
         years = today.year - self.birth_date.year
         had_birthday = (today.month, today.day) >= (self.birth_date.month, self.birth_date.day)
         return years if had_birthday else years - 1
+    
+    @property
+    def like_count(self):
+        return self.swipes_received.filter(liked=True).count()

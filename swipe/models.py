@@ -2,26 +2,18 @@ from django.db import models
 from django.conf import settings
 
 class Swipe(models.Model):
-    SWIPE_TYPE = (
-        ('like', 'Like'),
-        ('dislike', 'Dislike'),
-    )
-    
-    swiper = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='swipes_made'
-    )
-    swiped = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='swipes_received'
-    )
-    type = models.CharField(max_length=10, choices=SWIPE_TYPE)
+    swiper = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='swipes_made')
+    swiped = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='swipes_received')
+    liked = models.BooleanField(default=False)
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = ('swiper', 'swiped')
 
-    def __str__(self):
-        return f"{self.swiper} {self.type}d {self.swiped}"
+class Match(models.Model):
+    user1 = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='matches_as_user1')
+    user2 = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='matches_as_user2')
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user1', 'user2')

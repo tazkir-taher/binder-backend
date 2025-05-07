@@ -1,4 +1,6 @@
+import random
 from datetime import date
+from django.db import IntegrityError
 from django.contrib.auth import authenticate
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -9,19 +11,27 @@ from .models import Dater
 from .serializers import DaterRegistrationSerializer
 from user_profile.models import Profile
 
+def _generate_unique_username(first_name: str, last_name: str) -> str:
+    base = f"{first_name}{last_name}".lower()
+    for _ in range(5):
+        suffix = str(random.randint(1000, 9999))
+        uname = base + suffix
+        if not Dater.objects.filter(username=uname).exists():
+            return uname
+    # fallback in unlikely event of collision
+    return base + str(date.today().strftime("%Y%m%d%H%M%S"))
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register(request):
     data = request.data
-    pw = data.get('password')
+    pw  = data.get('password')
     pw2 = data.get('password2')
-    
     if not pw or not pw2:
         return Response(
             {"detail": "Both password and password2 are required."},
             status=status.HTTP_400_BAD_REQUEST
         )
-    
     if pw != pw2:
         return Response(
             {"password2": "Passwords do not match."},
@@ -32,6 +42,7 @@ def register(request):
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    # age check
     birth = serializer.validated_data.get('birth_date')
     if birth:
         today = date.today()
@@ -44,27 +55,49 @@ def register(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-    user_data = serializer.validated_data
+    user_data = serializer.validated_data.copy()
     user_data.pop('password2')
     password = user_data.pop('password')
-    user = Dater(**user_data)
-    user.set_password(password)
-    user.save()
+
+    # auto-generate a username
+    uname = _generate_unique_username(
+        user_data['first_name'],
+        user_data['last_name']
+    )
+
+    # build and save user
+    try:
+        user = Dater(username=uname, **user_data)
+        user.set_password(password)
+        user.save()
+    except IntegrityError:
+        return Response(
+            {"detail": "Could not generate a unique username, try again."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
     Profile.objects.create(user=user)
-
     refresh = RefreshToken.for_user(user)
-    tokens = {
+    tokens  = {
         'refresh': str(refresh),
-        'access': str(refresh.access_token),
+        'access':  str(refresh.access_token),
     }
 
-    out_serializer = DaterRegistrationSerializer(user)
-    return Response({
+    out = {
         "message": "Registration successful.",
-        "user": out_serializer.data,
+        "user": {
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "birth_date": str(user.birth_date),
+            "gender": user.gender,
+            "age": user.age,
+        },
         "tokens": tokens,
-    }, status=status.HTTP_201_CREATED)
+    }
+    return Response(out, status=status.HTTP_201_CREATED)
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
