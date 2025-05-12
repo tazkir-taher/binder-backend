@@ -32,7 +32,10 @@ INSTALLED_APPS = [
     'user_profile',
     'authentication',
     'swipe',
+    'message',   
 ]
+
+ALLOWED_HOSTS = ['*']
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

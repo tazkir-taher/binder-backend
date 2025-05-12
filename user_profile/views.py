@@ -22,18 +22,15 @@ def profile_view(request):
         }
         return Response(data, status=status.HTTP_200_OK)
 
-    # Handle POST for updates
     profile_fields = ['location', 'height', 'bio', 'interests', 'hobbies']
     user_fields = ['first_name', 'last_name', 'email', 'gender']
     updated = False
 
-    # Update user fields
     for field in user_fields:
         if field in request.data:
             setattr(user, field, request.data[field])
             updated = True
 
-    # Handle password separately
     if 'password' in request.data:
         user.set_password(request.data['password'])
         updated = True
@@ -41,7 +38,6 @@ def profile_view(request):
     if updated:
         user.save()
 
-    # Update profile fields
     for field in profile_fields:
         if field in request.data:
             setattr(profile, field, request.data[field])

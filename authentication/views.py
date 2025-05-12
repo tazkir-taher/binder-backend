@@ -18,7 +18,6 @@ def _generate_unique_username(first_name: str, last_name: str) -> str:
         uname = base + suffix
         if not Dater.objects.filter(username=uname).exists():
             return uname
-    # fallback in unlikely event of collision
     return base + str(date.today().strftime("%Y%m%d%H%M%S"))
 
 @api_view(['POST'])
@@ -42,7 +41,6 @@ def register(request):
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    # age check
     birth = serializer.validated_data.get('birth_date')
     if birth:
         today = date.today()
@@ -59,13 +57,11 @@ def register(request):
     user_data.pop('password2')
     password = user_data.pop('password')
 
-    # auto-generate a username
     uname = _generate_unique_username(
         user_data['first_name'],
         user_data['last_name']
     )
 
-    # build and save user
     try:
         user = Dater(username=uname, **user_data)
         user.set_password(password)
