@@ -17,13 +17,14 @@ def profile_view(request):
     if request.method == 'GET':
         serializer = ProfileSerializer(profile)
         data = {
-            k: v for k, v in serializer.data.items()
-            if v not in (None, '', [])
+            key: val
+            for key, val in serializer.data.items()
+            if val not in (None, '', [])
         }
         return Response(data, status=status.HTTP_200_OK)
 
     profile_fields = ['location', 'height', 'bio', 'interests', 'hobbies']
-    user_fields = ['first_name', 'last_name', 'email', 'gender']
+    user_fields    = ['first_name', 'last_name', 'email', 'gender']
     updated = False
 
     for field in user_fields:

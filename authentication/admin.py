@@ -5,7 +5,7 @@ from .models import Dater
 @admin.register(Dater)
 class DaterAdmin(UserAdmin):
     model = Dater
-    list_display = ('username', 'email', 'first_name', 'last_name', 'gender', 'birth_date', 'is_staff')
+    list_display = ('id','username', 'email', 'first_name', 'last_name', 'gender', 'birth_date','is_staff')
     fieldsets = UserAdmin.fieldsets + (
         ("Additional Info", {'fields': ('gender', 'birth_date')}),
     )
