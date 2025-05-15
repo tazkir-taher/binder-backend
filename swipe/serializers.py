@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from authentication.models import Dater
-from .models import Swipe, Match
+from .models import Connection
 
 class FeedUserSerializer(serializers.ModelSerializer):
     age       = serializers.IntegerField()
@@ -13,32 +13,23 @@ class FeedUserSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Dater
         fields = [
-            'id', 'username', 'first_name', 'last_name',
-            'age', 'gender',
-            'location', 'height', 'bio',
-            'interests', 'hobbies'
+            'id', 'first_name','last_name','email',
+            'age','gender',
+            'location','height','bio','interests','hobbies'
         ]
 
-class UserCardSerializer(serializers.ModelSerializer):
-    age = serializers.IntegerField()
-
-    class Meta:
-        model  = Dater
-        fields = ['id', 'username', 'first_name', 'last_name', 'age', 'gender']
-
-class SwipeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model  = Swipe
-        fields = ['id', 'swiped', 'liked']
-
 class MatchSerializer(serializers.ModelSerializer):
-    user = serializers.SerializerMethodField()
+    """
+    For listing matches: returns the other user and matched_at.
+    """
+    user       = serializers.SerializerMethodField()
+    matched_at = serializers.DateTimeField()
 
     class Meta:
-        model  = Match
-        fields = ['user', 'timestamp']
+        model  = Connection
+        fields = ['user', 'matched_at']
 
     def get_user(self, obj):
         request_user = self.context['request'].user
-        match_user   = obj.user2 if obj.user1 == request_user else obj.user1
-        return UserCardSerializer(match_user, context=self.context).data
+        other = obj.user2 if obj.user1 == request_user else obj.user1
+        return FeedUserSerializer(other, context=self.context).data

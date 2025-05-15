@@ -1,23 +1,20 @@
-import random
 from rest_framework import serializers
 from .models import Dater
 
 class DaterRegistrationSerializer(serializers.ModelSerializer):
-    username  = serializers.CharField(read_only=True)
     password  = serializers.CharField(write_only=True, min_length=8)
-    password2 = serializers.CharField(write_only=True, label="Confirm password", min_length=8)
+    password2 = serializers.CharField(write_only=True, min_length=8, label="Confirm password")
     age       = serializers.ReadOnlyField()
 
     class Meta:
-        model = Dater
-        fields = (
-            'username',
-            'first_name',
-            'last_name',
-            'email',
-            'birth_date',
-            'gender',
-            'age',
-            'password',
-            'password2',
-        )
+        model  = Dater
+        fields = [
+            'first_name', 'last_name',
+            'email', 'birth_date', 'gender',
+            'age', 'password', 'password2',
+        ]
+
+    def validate(self, attrs):
+        if attrs['password'] != attrs['password2']:
+            raise serializers.ValidationError({"password2": "Passwords do not match."})
+        return attrs

@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from .models import Profile
+from .models import DaterProfile
 from .serializers import ProfileSerializer
 
 @api_view(['GET', 'POST'])
@@ -12,7 +12,7 @@ from .serializers import ProfileSerializer
 @permission_classes([IsAuthenticated])
 def profile_view(request):
     user = request.user
-    profile, _ = Profile.objects.get_or_create(user=user)
+    profile, _ = DaterProfile.objects.get_or_create(user=user)
 
     if request.method == 'GET':
         serializer = ProfileSerializer(profile)
@@ -23,8 +23,7 @@ def profile_view(request):
         }
         return Response(data, status=status.HTTP_200_OK)
 
-    profile_fields = ['location', 'height', 'bio', 'interests', 'hobbies']
-    user_fields    = ['first_name', 'last_name', 'email', 'gender']
+    user_fields = ['first_name', 'last_name', 'email', 'gender']
     updated = False
 
     for field in user_fields:
@@ -39,6 +38,7 @@ def profile_view(request):
     if updated:
         user.save()
 
+    profile_fields = ['location', 'height', 'bio', 'interests', 'hobbies']
     for field in profile_fields:
         if field in request.data:
             setattr(profile, field, request.data[field])

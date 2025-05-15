@@ -1,7 +1,7 @@
 from django.contrib import admin
-from .models import Profile
+from .models import DaterProfile
 
-@admin.register(Profile)
-class ProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'location', 'height')
-    search_fields = ('user__username', 'location')
+@admin.register(DaterProfile)
+class DaterProfileAdmin(admin.ModelAdmin):
+    list_display  = ('user', 'location', 'height')
+    search_fields = ('user__email', 'location')

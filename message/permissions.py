@@ -1,20 +1,30 @@
 from rest_framework.permissions import BasePermission
-from swipe.models import Match
-from django.db.models import Q
-from authentication.models import Dater
+from swipe.models import Connection
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 class IsMatchedWithRecipient(BasePermission):
-   
+
     def has_permission(self, request, view):
+
         recipient_id = request.data.get('recipient_id') or view.kwargs.get('user_id')
         if not recipient_id:
             return False
+
         try:
-            recipient = Dater.objects.get(id=recipient_id)
-        except Dater.DoesNotExist:
+            recipient = User.objects.get(id=recipient_id)
+        except User.DoesNotExist:
             return False
 
-        me = request.user
-        return Match.objects.filter(
-            Q(user1=me, user2=recipient) | Q(user1=recipient, user2=me)
+        sender = request.user
+        u1, u2 = sorted([sender.id, recipient.id])
+
+
+        return Connection.objects.filter(
+            user1_id=u1,
+            user2_id=u2,
+            user1_liked=True,
+            user2_liked=True,
+            matched_at__isnull=False
         ).exists()

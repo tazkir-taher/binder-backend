@@ -1,9 +1,9 @@
 from django.urls import path
-from . import views
+from .views import swipe_feed, swipe_post, matches_list, match_detail
 
 urlpatterns = [
-    path('swipe/feed/', views.swipe_feed, name='swipe-feed'),
-    path('swipe/', views.swipe_post, name='swipe-post'),
-    path('matches/', views.matches_list, name='matches-list'),
-    path('matches/<int:user_id>/', views.match_detail, name='match-detail')
+    path('swipe/feed/',      swipe_feed,    name='swipe-feed'),
+    path('swipe/',           swipe_post,    name='swipe-post'),
+    path('matches/',         matches_list,  name='matches-list'),
+    path('matches/<int:user_id>/', match_detail, name='match-detail'),
 ]

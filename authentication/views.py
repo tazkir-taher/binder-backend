@@ -1,7 +1,4 @@
-# authentication/views.py
-
 from datetime import date
-import random
 
 from django.db import IntegrityError
 from django.contrib.auth import get_user_model
@@ -11,23 +8,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 
-from user_profile.models import Profile
+from user_profile.models import DaterProfile
 from .serializers import DaterRegistrationSerializer
 
 User = get_user_model()
-
-
-def _generate_unique_username(first_name: str, last_name: str) -> str:
-    base = f"{first_name}{last_name}".lower()
-    for _ in range(5):
-        suffix = str(random.randint(1000, 9999))
-        candidate = base + suffix
-        if not User.objects.filter(username=candidate).exists():
-            return candidate
-
-    return base + date.today().strftime("%Y%m%d%H%M%S")
 
 
 @api_view(['POST'])
@@ -46,6 +31,7 @@ def register(request):
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    # Age check
     birth = serializer.validated_data.get('birth_date')
     if birth:
         today = date.today()
@@ -60,17 +46,18 @@ def register(request):
     user_data.pop('password2')
     password = user_data.pop('password')
 
-    username = _generate_unique_username(user_data['first_name'], user_data['last_name'])
 
     try:
-        user = User(username=username, **user_data)
+        user = User(**user_data)
         user.set_password(password)
         user.save()
     except IntegrityError:
-        return Response({"detail": "Error creating user. Please try again."},
+        return Response({"detail": "Error creating user."},
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    Profile.objects.create(user=user)
+
+    DaterProfile.objects.create(user=user)
+
 
     refresh = RefreshToken.for_user(user)
     tokens = {'refresh': str(refresh), 'access': str(refresh.access_token)}
@@ -78,13 +65,12 @@ def register(request):
     return Response({
         "message": "Registration successful.",
         "user": {
-            "username": user.username,
             "first_name": user.first_name,
-            "last_name": user.last_name,
-            "email": user.email,
+            "last_name":  user.last_name,
+            "email":      user.email,
             "birth_date": str(user.birth_date),
-            "gender": user.gender,
-            "age": user.age,
+            "gender":     user.gender,
+            "age":        user.age,
         },
         "tokens": tokens,
     }, status=status.HTTP_201_CREATED)
@@ -113,7 +99,7 @@ def login_view(request):
         "message": "Login successful.",
         "tokens": {
             "refresh": str(refresh),
-            "access": str(refresh.access_token),
+            "access":  str(refresh.access_token),
         }
     }, status=status.HTTP_200_OK)
 
@@ -126,7 +112,6 @@ def logout_view(request):
     if not refresh_token:
         return Response({"detail": "Refresh token is required."},
                         status=status.HTTP_400_BAD_REQUEST)
-
     try:
         token = RefreshToken(refresh_token)
         token.blacklist()

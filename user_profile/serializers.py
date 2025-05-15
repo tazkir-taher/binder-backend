@@ -1,5 +1,5 @@
-from rest_framework import serializers 
-from .models import Profile
+from rest_framework import serializers
+from .models import DaterProfile
 
 class ProfileSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(source='user.first_name', read_only=True)
@@ -9,7 +9,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     gender     = serializers.CharField(source='user.gender',     read_only=True)
 
     class Meta:
-        model  = Profile
+        model = DaterProfile
         fields = [
             'first_name', 'last_name',
             'email', 'age', 'gender',
