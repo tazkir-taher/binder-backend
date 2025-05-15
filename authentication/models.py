@@ -3,7 +3,6 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 
 class Dater(AbstractUser):
-    
     username = None
 
     class Gender(models.TextChoices):
@@ -11,8 +10,6 @@ class Dater(AbstractUser):
         FEMALE = 'female', 'Female'
         OTHER  = 'other',  'Other'
 
-    first_name = models.CharField(max_length=150)
-    last_name  = models.CharField(max_length=150)
     email      = models.EmailField(unique=True)
     birth_date = models.DateField(null=True, blank=True)
     gender     = models.CharField(
@@ -21,8 +18,8 @@ class Dater(AbstractUser):
         default=Gender.OTHER,
     )
 
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['first_name', 'last_name']
+    USERNAME_FIELD  = 'email'
+    REQUIRED_FIELDS = [] 
 
     @property
     def age(self):
