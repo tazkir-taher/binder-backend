@@ -13,7 +13,7 @@ class DaterProfile(models.Model):
     interests = models.TextField(blank=True, null=True)
     hobbies   = models.TextField(blank=True, null=True)
     photo     = models.ImageField(
-        upload_to='profile_photos/',  # stored in MEDIA_ROOT/profile_photos/
+        upload_to='profile_photos/',
         blank=True,
         null=True
     )

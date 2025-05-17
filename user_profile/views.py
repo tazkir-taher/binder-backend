@@ -16,16 +16,11 @@ from .serializers import ProfileSerializer
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def profile_view(request):
-    """
-    GET:  Return the current user's profile (omitting empty/null fields).
-    POST: Update user/profile fields, including base64-encoded 'photo'.
-    """
     user = request.user
     profile, _ = DaterProfile.objects.get_or_create(user=user)
 
     data = request.data.copy()
 
-    # Handle base64 photo if provided
     if 'photo' in data and data['photo']:
         fmt, img_str = data['photo'].split(';base64,')
         ext = fmt.split('/')[-1]  # e.g. 'png' or 'jpeg'
@@ -35,7 +30,6 @@ def profile_view(request):
         data.pop('photo', None)
 
     if request.method == 'POST':
-        # Update core user fields
         user_updated = False
         for field in ['first_name', 'last_name', 'email', 'gender']:
             if field in data:
@@ -47,7 +41,6 @@ def profile_view(request):
         if user_updated:
             user.save()
 
-        # Update profile-specific fields
         profile_updated = False
         for field in ['location', 'height', 'bio', 'interests', 'hobbies', 'photo']:
             if field in data:
@@ -56,7 +49,6 @@ def profile_view(request):
         if profile_updated:
             profile.save()
 
-    # Serialize and return (omitting null/empty)
     serializer = ProfileSerializer(profile, context={'request': request})
     response_data = {
         k: v for k, v in serializer.data.items()
@@ -66,10 +58,6 @@ def profile_view(request):
 
 @api_view(['GET'])
 def serve_media(request, path):
-    """
-    Stream any file at `path` via whatever storage backend is configured.
-    E.g. /media/profile_photos/profile.jpeg → default_storage.open("profile_photos/profile.jpeg")
-    """
     if not default_storage.exists(path):
         raise Http404(f"Media '{path}' not found")
 
