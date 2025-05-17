@@ -1,6 +1,7 @@
 from django.urls import path
-from .views import profile_view
+from . import views
 
 urlpatterns = [
-    path('profile/', profile_view, name='user-profile'),
+    path('profile/', views.profile_view),
+    path('media/<path:path>/', views.serve_media),
 ]

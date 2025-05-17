@@ -1,9 +1,11 @@
 from rest_framework import serializers
 from authentication.models import Dater
 from .models import Connection
+from user_profile.serializers import ProfileSerializer
 
 class FeedUserSerializer(serializers.ModelSerializer):
     age       = serializers.IntegerField()
+    photo_url = serializers.SerializerMethodField()
     location  = serializers.CharField(source='profile.location', read_only=True)
     height    = serializers.IntegerField(source='profile.height',    read_only=True)
     bio       = serializers.CharField(source='profile.bio',         read_only=True)
@@ -14,22 +16,25 @@ class FeedUserSerializer(serializers.ModelSerializer):
         model  = Dater
         fields = [
             'id', 'first_name','last_name','email',
-            'age','gender',
-            'location','height','bio','interests','hobbies'
+            'age','gender','photo_url','location', 'height','bio','interests','hobbies'
         ]
 
+    def get_photo_url(self, obj):
+        request = self.context.get('request')
+        photo = getattr(obj.profile, 'photo', None)
+        if photo and hasattr(photo, 'url'):
+            return request.build_absolute_uri(photo.url)
+        return None
+
 class MatchSerializer(serializers.ModelSerializer):
-    """
-    For listing matches: returns the other user and matched_at.
-    """
     user       = serializers.SerializerMethodField()
     matched_at = serializers.DateTimeField()
 
     class Meta:
         model  = Connection
-        fields = ['user', 'matched_at']
+        fields = ['user','matched_at']
 
-    def get_user(self, obj):
-        request_user = self.context['request'].user
-        other = obj.user2 if obj.user1 == request_user else obj.user1
+    def get_user(self, conn):
+        me    = self.context['request'].user
+        other = conn.user2 if conn.user1 == me else conn.user1
         return FeedUserSerializer(other, context=self.context).data
