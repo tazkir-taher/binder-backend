@@ -23,7 +23,7 @@ def profile_view(request):
 
     if 'photo' in data and data['photo']:
         fmt, img_str = data['photo'].split(';base64,')
-        ext = fmt.split('/')[-1]  # e.g. 'png' or 'jpeg'
+        ext = fmt.split('/')[-1]
         img_file = ContentFile(base64.b64decode(img_str), name=f"profile.{ext}")
         data['photo'] = img_file
     else:
