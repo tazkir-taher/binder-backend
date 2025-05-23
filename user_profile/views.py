@@ -60,10 +60,6 @@ def profile_view(request):
         k: v for k, v in serializer.data.items()
         if v not in (None, '', [], {})
     }
-
-    if profile.photo and hasattr(profile.photo, 'url'):
-        response_data['photo_url'] = request.build_absolute_uri(profile.photo.url)
-
     return Response(response_data, status=status.HTTP_200_OK)
 
 
