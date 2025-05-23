@@ -14,12 +14,12 @@ from .serializers import DaterRegistrationSerializer
 
 User = get_user_model()
 
-
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register(request):
     data = request.data
     pw, pw2 = data.get('password'), data.get('password2')
+
     if not pw or not pw2:
         return Response({"detail": "Both password and password2 are required."},
                         status=status.HTTP_400_BAD_REQUEST)
@@ -31,7 +31,6 @@ def register(request):
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    # Age check
     birth = serializer.validated_data.get('birth_date')
     if birth:
         today = date.today()
@@ -46,7 +45,6 @@ def register(request):
     user_data.pop('password2')
     password = user_data.pop('password')
 
-
     try:
         user = User(**user_data)
         user.set_password(password)
@@ -55,9 +53,7 @@ def register(request):
         return Response({"detail": "Error creating user."},
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
     DaterProfile.objects.create(user=user)
-
 
     refresh = RefreshToken.for_user(user)
     tokens = {'refresh': str(refresh), 'access': str(refresh.access_token)}
@@ -74,7 +70,6 @@ def register(request):
         },
         "tokens": tokens,
     }, status=status.HTTP_201_CREATED)
-
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

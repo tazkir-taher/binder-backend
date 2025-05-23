@@ -1,8 +1,10 @@
 import base64
 import mimetypes
+
 from django.http import FileResponse, Http404
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
+
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -11,6 +13,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .models import DaterProfile
 from .serializers import ProfileSerializer
+
 
 @api_view(['GET', 'POST'])
 @authentication_classes([JWTAuthentication])
@@ -35,9 +38,11 @@ def profile_view(request):
             if field in data:
                 setattr(user, field, data[field])
                 user_updated = True
+
         if 'password' in data:
             user.set_password(data['password'])
             user_updated = True
+
         if user_updated:
             user.save()
 
@@ -46,6 +51,7 @@ def profile_view(request):
             if field in data:
                 setattr(profile, field, data[field])
                 profile_updated = True
+
         if profile_updated:
             profile.save()
 
@@ -54,7 +60,12 @@ def profile_view(request):
         k: v for k, v in serializer.data.items()
         if v not in (None, '', [], {})
     }
+
+    if profile.photo and hasattr(profile.photo, 'url'):
+        response_data['photo_url'] = request.build_absolute_uri(profile.photo.url)
+
     return Response(response_data, status=status.HTTP_200_OK)
+
 
 @api_view(['GET'])
 def serve_media(request, path):
@@ -63,6 +74,7 @@ def serve_media(request, path):
 
     file_handle = default_storage.open(path, mode='rb')
     content_type, _ = mimetypes.guess_type(path)
+
     return FileResponse(
         file_handle,
         content_type=content_type or 'application/octet-stream',

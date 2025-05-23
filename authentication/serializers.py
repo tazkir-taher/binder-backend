@@ -13,8 +13,3 @@ class DaterRegistrationSerializer(serializers.ModelSerializer):
             'email', 'birth_date', 'gender',
             'age', 'password', 'password2',
         ]
-
-    def validate(self, attrs):
-        if attrs['password'] != attrs['password2']:
-            raise serializers.ValidationError({"password2": "Passwords do not match."})
-        return attrs

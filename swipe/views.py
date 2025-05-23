@@ -29,8 +29,15 @@ def swipe_feed(request):
     elif me.gender == 'female':
         qs = qs.filter(gender='male')
 
-    serializer = FeedUserSerializer(qs, many=True, context={'request': request})
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    serialized = []
+    for user in qs:
+        data = FeedUserSerializer(user).data
+        photo = getattr(user.profile, 'photo', None)
+        photo_url = request.build_absolute_uri(photo.url) if photo and hasattr(photo, 'url') else None
+        data['photo_url'] = photo_url
+        serialized.append(data)
+
+    return Response(serialized, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -71,16 +78,27 @@ def swipe_post(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def matches_list(request):
-
     me = request.user
 
-    qs = Connection.objects.filter(
+    conns = Connection.objects.filter(
         Q(user1=me, user1_liked=True, user2_liked=True) |
         Q(user2=me, user1_liked=True, user2_liked=True)
     ).filter(matched_at__isnull=False)
 
-    serializer = MatchSerializer(qs, many=True, context={'request': request})
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    matches = []
+    for conn in conns:
+        other = conn.user2 if conn.user1 == me else conn.user1
+        user_data = FeedUserSerializer(other).data
+        photo = getattr(other.profile, 'photo', None)
+        photo_url = request.build_absolute_uri(photo.url) if photo and hasattr(photo, 'url') else None
+        user_data['photo_url'] = photo_url
+
+        matches.append({
+            'user': user_data,
+            'matched_at': conn.matched_at,
+        })
+
+    return Response(matches, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])

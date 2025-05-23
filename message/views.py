@@ -45,7 +45,6 @@ def get_conversation(request, user_id):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def recent_chats(request):
-    
     me = request.user
 
     conns = Connection.objects.filter(
@@ -64,10 +63,21 @@ def recent_chats(request):
             Q(sender=me, recipient_id=uid) |
             Q(sender_id=uid, recipient=me)
         ).order_by('-timestamp').first()
-        if last:
-            previews.append(last)
 
-    return Response(
-        ChatPreviewSerializer(previews, many=True, context={'request': request}).data,
-        status=status.HTTP_200_OK
-    )
+        if last:
+            other_user = last.recipient if last.sender == me else last.sender
+            preview_data = {
+                'user': {
+                    'id': other_user.id,
+                    'username': other_user.username,
+                    'first_name': other_user.first_name,
+                    'last_name': other_user.last_name,
+                },
+                'content': last.content,
+                'timestamp': last.timestamp,
+                'read': last.read,
+                'is_sent_by_user': last.sender == me,
+            }
+            previews.append(preview_data)
+
+    return Response(previews, status=status.HTTP_200_OK)
