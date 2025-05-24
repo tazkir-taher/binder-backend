@@ -5,7 +5,7 @@ from .models import Dater
 @admin.register(Dater)
 class DaterAdmin(UserAdmin):
 
-    list_display = ('email', 'first_name', 'last_name', 'gender', 'is_staff', 'is_active')
+    list_display = ('id','email', 'first_name', 'last_name', 'gender', 'is_staff', 'is_active')
 
     search_fields = ('email', 'first_name', 'last_name')
 

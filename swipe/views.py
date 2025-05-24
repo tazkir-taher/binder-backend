@@ -1,125 +1,114 @@
-from django.db.models import Q
 from django.utils import timezone
-
-from rest_framework import status
+from django.db.models import Q
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import status
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from authentication.models import Dater
-from user_profile.serializers import ProfileSerializer
 from .models import Connection
-from .serializers import FeedUserSerializer, MatchSerializer
+from .serializers import ConnectionSerializer
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
-def swipe_feed(request):
-    me = request.user
+def feed(request):
+    swiper = request.user
+    opposite = 'female' if swiper.gender == 'male' else 'male'
 
-    conns = Connection.objects.filter(Q(user1=me) | Q(user2=me))
-    seen_ids = {c.user1_id for c in conns} | {c.user2_id for c in conns}
-    seen_ids.discard(me.id)
+    sent_ids = Connection.objects.filter(sender=swiper).values_list('receiver_id', flat=True)
+    received_ids = Connection.objects.filter(receiver=swiper).values_list('sender_id', flat=True)
+    excluded = set(sent_ids) | set(received_ids) | {swiper.id}
 
-    qs = Dater.objects.exclude(id=me.id).exclude(id__in=seen_ids)
-
-    if me.gender == 'male':
-        qs = qs.filter(gender='female')
-    elif me.gender == 'female':
-        qs = qs.filter(gender='male')
-
-    serialized = []
-    for user in qs:
-        data = FeedUserSerializer(user).data
-        photo = getattr(user.profile, 'photo', None)
-        photo_url = request.build_absolute_uri(photo.url) if photo and hasattr(photo, 'url') else None
-        data['photo_url'] = photo_url
-        serialized.append(data)
-
-    return Response(serialized, status=status.HTTP_200_OK)
-
+    candidates = Dater.objects.filter(gender=opposite).exclude(id__in=excluded)
+    data = []
+    for user in candidates:
+        data.append({
+            'id': user.id,
+            'username': user.username,
+            'gender': user.gender,
+            'profile_url': request.build_absolute_uri(user.profile.photo.url) if hasattr(user, 'profile') and user.profile.photo else None,
+        })
+    return Response(data, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
-def swipe_post(request):
-    me = request.user
-    swiped_id = request.data.get('swiped_user_id')
-    liked     = request.data.get('liked')
+def swipe(request):
+    swiper = request.user
+    receiver_id = request.data.get('receiver_id')
+    like = request.data.get('like')
 
-    if swiped_id is None or liked is None:
-        return Response(
-            {"detail": "swiped_user_id and liked are required."},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    if receiver_id is None or like is None:
+        return Response({'detail': 'receiver_id and like are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        other = Dater.objects.get(id=swiped_id)
+        receiver = Dater.objects.get(id=receiver_id)
     except Dater.DoesNotExist:
-        return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    u1, u2 = sorted([me.id, other.id])
-    conn, created = Connection.objects.get_or_create(user1_id=u1, user2_id=u2)
+    if receiver == swiper:
+        return Response({'detail': "You can't swipe on yourself."}, status=status.HTTP_400_BAD_REQUEST)
 
-    if me.id == conn.user1_id:
-        conn.user1_liked = liked
-    else:
-        conn.user2_liked = liked
+    if not like:
+        return Response({'detail': 'Skipped.'}, status=status.HTTP_200_OK)
 
-    if conn.user1_liked and conn.user2_liked and conn.matched_at is None:
-        conn.matched_at = timezone.now()
+    try:
+        reverse_conn = Connection.objects.get(sender=receiver, receiver=swiper)
+        reverse_conn.matched = True
+        reverse_conn.save()
 
-    conn.save()
-    return Response({"message": "Swipe recorded."}, status=status.HTTP_201_CREATED)
+        conn = reverse_conn
+        matched = True
+    except Connection.DoesNotExist:
+        conn = Connection.objects.get_or_create(sender=swiper, receiver=receiver)
+        matched = False
 
+    serializer = ConnectionSerializer(conn, context={'request': request})
+    return Response({'connection': serializer.data, 'matched': matched}, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def matches_list(request):
-    me = request.user
-
+    swiper = request.user
     conns = Connection.objects.filter(
-        Q(user1=me, user1_liked=True, user2_liked=True) |
-        Q(user2=me, user1_liked=True, user2_liked=True)
-    ).filter(matched_at__isnull=False)
-
-    matches = []
+        Q(sender=swiper) | Q(receiver=swiper),
+        matched=True
+    )
+    results = []
     for conn in conns:
-        other = conn.user2 if conn.user1 == me else conn.user1
-        user_data = FeedUserSerializer(other).data
-        photo = getattr(other.profile, 'photo', None)
-        photo_url = request.build_absolute_uri(photo.url) if photo and hasattr(photo, 'url') else None
-        user_data['photo_url'] = photo_url
-
-        matches.append({
+        other = conn.receiver if conn.sender == swiper else conn.sender
+        user_data = {
+            'id': other.id,
+            'username': other.username,
+        }
+        results.append({
             'user': user_data,
             'matched_at': conn.matched_at,
         })
-
-    return Response(matches, status=status.HTTP_200_OK)
-
+    return Response(results, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def match_detail(request, user_id):
-    me = request.user
-    u1, u2 = sorted([me.id, user_id])
+    swiper = request.user
+    conn = Connection.objects.filter(
+        Q(sender=swiper, receiver_id=user_id) | Q(sender_id=user_id, receiver=swiper),
+        matched=True
+    ).first()
 
-    try:
-        conn = Connection.objects.get(user1_id=u1, user2_id=u2)
-    except Connection.DoesNotExist:
-        return Response({"detail": "Not matched with this user."},
-                        status=status.HTTP_403_FORBIDDEN)
-
-    if not (conn.user1_liked and conn.user2_liked and conn.matched_at):
-        return Response({"detail": "Not a mutual match."},
-                        status=status.HTTP_403_FORBIDDEN)
+    if not conn:
+        return Response({'detail': 'Not a mutual match.'}, status=status.HTTP_403_FORBIDDEN)
 
     other = Dater.objects.get(id=user_id)
-    profile = other.profile
+    profile = getattr(other, 'profile', None)
+    if not profile:
+        return Response({'detail': 'Profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    from user_profile.serializers import ProfileSerializer
     serializer = ProfileSerializer(profile, context={'request': request})
     data = {k: v for k, v in serializer.data.items() if v not in (None, '', [])}
     return Response(data, status=status.HTTP_200_OK)

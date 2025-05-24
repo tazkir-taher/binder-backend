@@ -1,24 +1,21 @@
 from django.db import models
-from django.conf import settings
+from authentication.models import Dater
 
 class Connection(models.Model):
-    user1 = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='connections_as_user1'
+    sender = models.ForeignKey(
+        Dater,
+        related_name='sent_connections',
+        on_delete=models.CASCADE
     )
-    user2 = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='connections_as_user2'
+    receiver = models.ForeignKey(
+        Dater,
+        related_name='received_connections',
+        on_delete=models.CASCADE
     )
-    user1_liked = models.BooleanField(default=False)
-    user2_liked = models.BooleanField(default=False)
-    matched_at  = models.DateTimeField(null=True, blank=True)
-    timestamp   = models.DateTimeField(auto_now_add=True)
+    matched = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ('user1', 'user2')
+        unique_together = ('sender', 'receiver')
 
     def __str__(self):
-        return f"{self.user1.id}<–>{self.user2.id}  matched_at={self.matched_at}"
+        return f"{self.sender} → {self.receiver} | matched={self.matched}"

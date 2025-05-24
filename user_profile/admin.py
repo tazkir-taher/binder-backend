@@ -3,5 +3,5 @@ from .models import DaterProfile
 
 @admin.register(DaterProfile)
 class DaterProfileAdmin(admin.ModelAdmin):
-    list_display  = ('user', 'location', 'height')
+    list_display  = ('id','user', 'location', 'height')
     search_fields = ('user__email', 'location')
