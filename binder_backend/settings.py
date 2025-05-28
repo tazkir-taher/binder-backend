@@ -1,21 +1,20 @@
-from pathlib import Path
-from datetime import timedelta
 import os
+from pathlib import Path
+import environ
+from datetime import timedelta
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+env = environ.Env(
+    DEBUG=(bool, False),
+)
+
+
+environ.Env.read_env(os.path.join(Path(__file__).resolve().parent.parent, '.env'))
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-*nfx-7jlvln&k#8%=s@n(sj*ye4p#czmv9c-t_@(8&0xv$pqec'
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = ['*']
-
-
-# Application definition
+SECRET_KEY = env('SECRET_KEY')
+DEBUG      = env('DEBUG')
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -25,13 +24,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    # Third‑party
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
 
-    # Your apps
-    'user_profile',
     'authentication',
     'swipe',
     'message',
@@ -48,11 +44,12 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'binder_backend.urls'
+WSGI_APPLICATION = 'binder_backend.wsgi.application'
 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],       # add template dirs here if needed
+        'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -65,26 +62,22 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'binder_backend.wsgi.application'
-
-
-# Database
-# https://docs.djangoproject.com/en/3.2/ref/settings/#databases
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE':   'django.db.backends.mysql',
+        'NAME':     env('DB_NAME'),
+        'USER':     env('DB_USER'),
+        'PASSWORD': env('DB_PASS'),
+        'HOST':     env('DB_HOST', default='127.0.0.1'),
+        'PORT':     env('DB_PORT', default='3306'),
+        'OPTIONS': {
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+        },
     }
 }
 
-
-# Use your custom user model
 AUTH_USER_MODEL = 'authentication.Dater'
-
-
-# Password validation
-# https://docs.djangoproject.com/en/3.2/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',},
@@ -93,40 +86,19 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',},
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/3.2/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE     = 'UTC'
 USE_I18N      = True
 USE_L10N      = True
 USE_TZ        = True
 
+STATIC_URL  = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/3.2/howto/static-files/
-
-STATIC_URL = '/static/'
-
-
-# Media files (user uploads)
-# We’ll serve these through a custom view rather than direct filesystem.
-MEDIA_URL  = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
-# If you later switch to S3 or another backend, just add:
-# DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-# (plus your AWS credentials) and the below view & URLs will keep working.
-
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
+MEDIA_URL   = '/media/'
+MEDIA_ROOT  = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-
-# Django REST Framework
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -134,13 +106,14 @@ REST_FRAMEWORK = {
     ],
 }
 
-
-# Simple JWT
-
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME':  timedelta(days=14),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=14),
-    'AUTH_HEADER_TYPES':       ('Bearer',),
+    'ROTATE_REFRESH_TOKENS':   True,
     'BLACKLIST_AFTER_ROTATION': True,
-    'ROTATE_REFRESH_TOKENS':    True,
+    'UPDATE_LAST_LOGIN':       False,
+    'AUTH_HEADER_TYPES':       ('Bearer',),
+    'AUTH_HEADER_NAME':        'HTTP_AUTHORIZATION',
+    'ALGORITHM':               'HS256',
+    'JTI_CLAIM':               'jti',
 }

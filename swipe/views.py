@@ -1,5 +1,3 @@
-from django.utils import timezone
-from django.db.models import Q
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -7,6 +5,7 @@ from rest_framework import status
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from authentication.models import Dater
+from authentication.serializers import DaterSerializer
 from .models import Connection
 from .serializers import ConnectionSerializer
 
@@ -15,22 +14,23 @@ from .serializers import ConnectionSerializer
 @permission_classes([IsAuthenticated])
 def feed(request):
     swiper = request.user
-    opposite = 'female' if swiper.gender == 'male' else 'male'
 
-    sent_ids = Connection.objects.filter(sender=swiper).values_list('receiver_id', flat=True)
-    received_ids = Connection.objects.filter(receiver=swiper).values_list('sender_id', flat=True)
-    excluded = set(sent_ids) | set(received_ids) | {swiper.id}
+    if swiper.gender == 'male':
+        opposite = ['female']
+    elif swiper.gender == 'female':
+        opposite = ['male']
+    else:
+        opposite = ['male', 'female', 'other']
 
-    candidates = Dater.objects.filter(gender=opposite).exclude(id__in=excluded)
-    data = []
-    for user in candidates:
-        data.append({
-            'id': user.id,
-            'username': user.username,
-            'gender': user.gender,
-            'profile_url': request.build_absolute_uri(user.profile.photo.url) if hasattr(user, 'profile') and user.profile.photo else None,
-        })
-    return Response(data, status=status.HTTP_200_OK)
+    seen_ids = Connection.objects.filter(sender=swiper).values_list('receiver_id', flat=True)
+    candidates = Dater.objects.filter(gender__in=opposite).exclude(id__in=seen_ids).exclude(id=swiper.id)
+
+    serializer = DaterSerializer(candidates, many=True, context={'request': request})
+    return Response({
+        "message": "Feed fetched successfully.",
+        "code": status.HTTP_200_OK,
+        "data": serializer.data
+    })
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
@@ -41,74 +41,109 @@ def swipe(request):
     like = request.data.get('like')
 
     if receiver_id is None or like is None:
-        return Response({'detail': 'receiver_id and like are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            "message": "receiver_id and like are required.",
+            "code": status.HTTP_400_BAD_REQUEST
+        })
 
     try:
         receiver = Dater.objects.get(id=receiver_id)
     except Dater.DoesNotExist:
-        return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({
+            "message": "User not found.",
+            "code": status.HTTP_400_BAD_REQUEST
+        })
 
     if receiver == swiper:
-        return Response({'detail': "You can't swipe on yourself."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            "message": "You can't swipe on yourself.",
+            "code": status.HTTP_400_BAD_REQUEST
+        })
 
     if not like:
-        return Response({'detail': 'Skipped.'}, status=status.HTTP_200_OK)
+        matched = False
+        return Response({
+            "message": "Skipped.",
+            "code": status.HTTP_200_OK,
+            "data": {"matched": matched, "receiver_name": receiver.first_name}
+        })
 
-    try:
-        reverse_conn = Connection.objects.get(sender=receiver, receiver=swiper)
-        reverse_conn.matched = True
-        reverse_conn.save()
+    mutual = Connection.objects.filter(sender=receiver, receiver=swiper, matched=False).exists()
 
-        conn = reverse_conn
+    if mutual:
+        Connection.objects.filter(sender=receiver, receiver=swiper).update(matched=True)
         matched = True
-    except Connection.DoesNotExist:
-        conn = Connection.objects.get_or_create(sender=swiper, receiver=receiver)
+    else:
+        Connection.objects.get_or_create(sender=swiper, receiver=receiver)
         matched = False
 
-    serializer = ConnectionSerializer(conn, context={'request': request})
-    return Response({'connection': serializer.data, 'matched': matched}, status=status.HTTP_200_OK)
+    return Response({
+        "message": "Swipe recorded.",
+        "code": status.HTTP_200_OK,
+        "data": {"matched": matched, "receiver_name": receiver.first_name}
+    })
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def likes_received(request):
+    user = request.user
+
+    liker_ids = Connection.objects.filter(receiver=user, matched=False).values_list('sender_id', flat=True)
+
+    likers = Dater.objects.filter(id__in=liker_ids)
+    serializer = DaterSerializer(likers, many=True, context={'request': request})
+
+    return Response({
+        "message": "Likes received fetched successfully.",
+        "code": 200,
+        "data": serializer.data
+    })
+
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def matches_list(request):
-    swiper = request.user
-    conns = Connection.objects.filter(
-        Q(sender=swiper) | Q(receiver=swiper),
-        matched=True
-    )
-    results = []
-    for conn in conns:
-        other = conn.receiver if conn.sender == swiper else conn.sender
-        user_data = {
-            'id': other.id,
-            'username': other.username,
-        }
-        results.append({
-            'user': user_data,
-            'matched_at': conn.matched_at,
-        })
-    return Response(results, status=status.HTTP_200_OK)
+    user = request.user
+    sent = Connection.objects.filter(sender=user, matched=True)
+    received = Connection.objects.filter(receiver=user, matched=True)
+    matches = list(sent) + list(received)
+    serializer = ConnectionSerializer(matches, many=True, context={'request': request})
+    return Response({
+        "message": "Matches fetched successfully.",
+        "code": status.HTTP_200_OK,
+        "data": serializer.data
+    })
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def match_detail(request, user_id):
-    swiper = request.user
-    conn = Connection.objects.filter(
-        Q(sender=swiper, receiver_id=user_id) | Q(sender_id=user_id, receiver=swiper),
-        matched=True
-    ).first()
+    user = request.user
+    as_sender = Connection.objects.filter(sender=user, receiver_id=user_id, matched=True).first()
+    as_receiver = Connection.objects.filter(sender_id=user_id, receiver=user, matched=True).first()
+    if not (as_sender or as_receiver):
+        return Response({
+            "message": "Not a mutual match.",
+            "code": status.HTTP_403_FORBIDDEN
+        })
 
-    if not conn:
-        return Response({'detail': 'Not a mutual match.'}, status=status.HTTP_403_FORBIDDEN)
+    try:
+        other = Dater.objects.get(id=user_id)
+    except Dater.DoesNotExist:
+        return Response({
+            "message": "User not found.",
+            "code": status.HTTP_404_NOT_FOUND
+        })
 
-    other = Dater.objects.get(id=user_id)
-    profile = getattr(other, 'profile', None)
-    if not profile:
-        return Response({'detail': 'Profile not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-    from user_profile.serializers import ProfileSerializer
-    serializer = ProfileSerializer(profile, context={'request': request})
-    data = {k: v for k, v in serializer.data.items() if v not in (None, '', [])}
-    return Response(data, status=status.HTTP_200_OK)
+    serializer = DaterSerializer(other, context={'request': request})
+    data = {
+        k: v for k, v in serializer.data.items()
+        if v not in (None, '', [], {})
+    }
+    return Response({
+        "message": "Match detail fetched successfully.",
+        "code": status.HTTP_200_OK,
+        "data": data
+    })

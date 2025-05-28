@@ -1,15 +1,13 @@
+
 from django.contrib import admin
-from django.urls import path, include, re_path
-from user_profile.views import serve_media
+from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('auth/', include('authentication.urls')),
-    path('home/', include('swipe.urls')),
-    path('user/', include('user_profile.urls')),
-    path('messages/', include('message.urls')),
+    path('api/', include('api.urls')),
 ]
 
-urlpatterns += [
-    re_path(r'^media/(?P<path>.*)$', serve_media, name='serve-media'),
-]
+urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

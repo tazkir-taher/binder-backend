@@ -1,27 +1,5 @@
-from datetime import date
 from django.db import models
-from django.contrib.auth.models import AbstractUser, BaseUserManager
-
-class DaterManager(BaseUserManager):
-    def create_user(self, email, password=None, **extra_fields):
-        if not email:
-            raise ValueError('Email is required')
-        email = self.normalize_email(email)
-        user = self.model(email=email, **extra_fields)
-        user.set_password(password)
-        user.save(using=self._db)
-        return user
-
-    def create_superuser(self, email, password=None, **extra_fields):
-        extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
-
-        if extra_fields.get('is_staff') is not True:
-            raise ValueError('Superuser must have is_staff=True.')
-        if extra_fields.get('is_superuser') is not True:
-            raise ValueError('Superuser must have is_superuser=True.')
-
-        return self.create_user(email, password, **extra_fields)
+from django.contrib.auth.models import AbstractUser
 
 class Dater(AbstractUser):
     username = None
@@ -33,26 +11,17 @@ class Dater(AbstractUser):
 
     email      = models.EmailField(unique=True)
     birth_date = models.DateField(null=True, blank=True)
-    gender     = models.CharField(
-        max_length=10,
-        choices=Gender.choices,
-        default=Gender.OTHER,
-    )
+    gender     = models.CharField(max_length=10, choices=Gender.choices, default=Gender.OTHER)
+    
+    location  = models.CharField(max_length=100, blank=True, null=True)
+    height    = models.PositiveIntegerField(blank=True, null=True)
+    bio       = models.TextField(blank=True, null=True)
+    interests = models.TextField(blank=True, null=True)
+    hobbies   = models.TextField(blank=True, null=True)
+    photo     = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
 
     USERNAME_FIELD  = 'email'
-    REQUIRED_FIELDS = []  # you can add 'gender' here if you want to prompt for it
+    REQUIRED_FIELDS = []
 
-    objects = DaterManager()  # 🔥 The Magic Line
-
-    @property
-    def age(self):
-        if not self.birth_date:
-            return None
-        today = date.today()
-        years = today.year - self.birth_date.year
-        had_birthday = (today.month, today.day) >= (self.birth_date.month, self.birth_date.day)
-        return years if had_birthday else years - 1
-
-    @property
-    def like_count(self):
-        return self.swipes_received.filter(liked=True).count()
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} <{self.email}>"
