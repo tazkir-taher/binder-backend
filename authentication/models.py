@@ -9,6 +9,13 @@ class Dater(AbstractUser):
         FEMALE = 'female', 'Female'
         OTHER  = 'other',  'Other'
 
+    INTERESTS = (
+        ('singing', 'Singing'),
+        ('travelling', 'Travelling'),
+        ('gaming', 'Gaming'),
+        ('photography', 'Photography'),
+        ('gardening', 'Gardening'),
+    )
     email      = models.EmailField(unique=True)
     birth_date = models.DateField(null=True, blank=True)
     gender     = models.CharField(max_length=10, choices=Gender.choices, default=Gender.OTHER)
@@ -16,7 +23,7 @@ class Dater(AbstractUser):
     location  = models.CharField(max_length=100, blank=True, null=True)
     height    = models.PositiveIntegerField(blank=True, null=True)
     bio       = models.TextField(blank=True, null=True)
-    interests = models.TextField(blank=True, null=True)
+    interests = models.CharField(max_length=200, choices=INTERESTS, null = True, blank = True)
     hobbies   = models.TextField(blank=True, null=True)
     photo     = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
 

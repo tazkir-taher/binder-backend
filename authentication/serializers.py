@@ -25,4 +25,4 @@ class DaterSerializer(serializers.ModelSerializer):
             'location', 'height', 'bio',
             'interests', 'hobbies', 'photo',
         ]
-        read_only_fields = ['id', 'email', 'age']
+        read_only_fields = ['id', 'email', 'age', 'gender', 'birth_date']
