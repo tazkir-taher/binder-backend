@@ -18,17 +18,6 @@ from .serializers import *
 
 User = get_user_model()
 
-def _compute_age(birth_date):
-    if not birth_date:
-        return None
-    today = date.today()
-    years = today.year - birth_date.year
-    had_bday = (today.month, today.day) >= (birth_date.month, birth_date.day)
-    return years if had_bday else years - 1
-
-def _compute_like_count(user):
-    return user.received_connections.filter(matched=False).count()
-
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register(request):
@@ -160,8 +149,7 @@ def logout_view(request):
 def profile_get(request):
     user = request.user
     out = DaterSerializer(user, context={'request': request}).data
-    out['age'] = _compute_age(user.birth_date)
-    out['like_count'] = _compute_like_count(user)
+
     return Response({
         "message": "Profile fetched successfully.",
         "code": status.HTTP_200_OK,
@@ -193,8 +181,7 @@ def profile_edit(request):
 
     serializer.save()
     out = serializer.data
-    out['age'] = _compute_age(user.birth_date)
-    out['like_count'] = _compute_like_count(user)
+    
     return Response({
         "message": "Profile updated successfully.",
         "code": status.HTTP_200_OK,

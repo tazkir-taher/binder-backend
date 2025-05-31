@@ -5,7 +5,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from django.db.models import Q
 from authentication.models import *
 from authentication.serializers import *
 from .models import *
@@ -39,8 +38,6 @@ def feed(request):
 def search(request):
     user = request.user
 
-    candidates = Dater.objects.all()
-
     try:
         conn_search = ConnectionSearch.objects.get(interest_filter=user)
     except ConnectionSearch.DoesNotExist:
@@ -54,48 +51,37 @@ def search(request):
         try:
             conn_search.min_age = int(min_age_value)
         except (ValueError, TypeError):
-            return Response({
-                "message": "min_age must be an integer.",
-                "code": 400
-            })
+            return Response({"message": "min_age must be an integer.", "code": 400})
 
     max_age_value = request.data.get("max_age")
     if max_age_value is not None:
         try:
             conn_search.max_age = int(max_age_value)
         except (ValueError, TypeError):
-            return Response({
-                "message": "max_age must be an integer.",
-                "code": 400
-            })
-
-    conn_search = ConnectionSearch.objects.get(interest_filter=user)
+            return Response({"message": "max_age must be an integer.", "code": 400})
 
     interest_filter_value = request.data.get("interest_filter")
     if interest_filter_value:
         conn_search.interests = interest_filter_value
-        conn_search.save()
 
-    candidates = Dater.objects.all()
+    conn_search.save()
+
+    candidates = Dater.objects.exclude(id=user.id)
 
     today = date.today()
+
     if conn_search.max_age is not None:
-        try:
-            max_bday_cutoff = today - relativedelta(years=conn_search.max_age)
-        except Exception:
-            max_bday_cutoff = date(today.year - conn_search.max_age, today.month, today.day)
+        max_bday_cutoff = today - relativedelta(years=conn_search.max_age)
         candidates = candidates.filter(birth_date__gte=max_bday_cutoff)
 
     if conn_search.min_age is not None:
-        try:
-            min_bday_cutoff = today - relativedelta(years=conn_search.min_age)
-        except Exception:
-            min_bday_cutoff = date(today.year - conn_search.min_age, today.month, today.day)
+        min_bday_cutoff = today - relativedelta(years=conn_search.min_age)
         candidates = candidates.filter(birth_date__lte=min_bday_cutoff)
 
-    candidates = candidates.filter(birth_date__isnull=False)
+    if conn_search.interests:
+        candidates = candidates.filter(interests=conn_search.interests)
 
-    candidates = Dater.objects.filter(interests=conn_search.interests).exclude(id=user.id)
+    candidates = candidates.filter(birth_date__isnull=False)
 
     serializer = DaterSerializer(candidates, many=True)
     return Response(serializer.data)

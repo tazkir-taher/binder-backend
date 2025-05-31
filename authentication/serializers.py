@@ -26,3 +26,6 @@ class DaterSerializer(serializers.ModelSerializer):
             'interests', 'hobbies', 'photo',
         ]
         read_only_fields = ['id', 'email', 'age', 'gender', 'birth_date']
+        
+    def get_age(self, obj):
+        return obj.age

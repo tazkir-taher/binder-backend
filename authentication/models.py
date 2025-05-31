@@ -1,3 +1,4 @@
+from datetime import date
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
@@ -29,6 +30,19 @@ class Dater(AbstractUser):
 
     USERNAME_FIELD  = 'email'
     REQUIRED_FIELDS = []
+
+    @property
+    def age(self):
+        if self.birth_date:
+            today = date.today()
+            years = today.year - self.birth_date.year
+            had_bday = (today.month, today.day) >= (self.birth_date.month, self.birth_date.day)
+            return years if had_bday else years - 1
+        return None
+    
+    @property
+    def like_count(self):
+        return self.received_connections.filter(matched=False).count()
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} <{self.email}>"
