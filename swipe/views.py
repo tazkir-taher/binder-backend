@@ -43,7 +43,6 @@ def search(request):
     if not conn_search:
         conn_search = ConnectionSearch.objects.create(owner=user)
 
-
     min_age_value = request.data.get("min_age")
     if min_age_value is not None:
         try:
@@ -53,7 +52,7 @@ def search(request):
                 "message": "min_age must be an integer.",
                 "code": 400
             })
-
+        
     max_age_value = request.data.get("max_age")
     if max_age_value is not None:
         try:
@@ -78,6 +77,9 @@ def search(request):
         opposites = ['male']
     candidates = candidates.filter(gender__in=opposites)
 
+    seen_ids = Connection.objects.filter(sender=user).values_list('receiver_id', flat=True)
+    candidates = candidates.exclude(id__in=seen_ids)
+
     today = date.today()
     if conn_search.max_age is not None:
         cutoff_for_max = today - relativedelta(years=conn_search.max_age)
@@ -93,7 +95,11 @@ def search(request):
     candidates = candidates.filter(birth_date__isnull=False)
 
     serializer = DaterSerializer(candidates, many=True)
-    return Response(serializer.data)
+    return Response({
+        "message": "Search results fetched successfully.",
+        "code": 200,
+        "data": serializer.data
+    })
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])

@@ -142,7 +142,8 @@ def login_view(request):
         user.is_active = True
         user.save(update_fields=['is_active'])
         refresh = RefreshToken.for_user(user)
-        tokens = {"refresh": str(refresh), "access": str(refresh.access_token)}
+        tokens = {"refresh": str(refresh),
+                  "access": str(refresh.access_token)}
         return Response(
             {
                 "message": "Account reactivated! Welcome back!",
@@ -152,7 +153,8 @@ def login_view(request):
         )
 
     refresh = RefreshToken.for_user(user)
-    tokens = {"refresh": str(refresh), "access": str(refresh.access_token)}
+    tokens = {"refresh": str(refresh),
+              "access": str(refresh.access_token)}
     return Response(
         {
             "message": "Login successful!",
@@ -336,7 +338,9 @@ def forgot_Password(request):
 def profile_get(request):
     user = request.user
     out = DaterSerializer(user, context={'request': request}).data
-    return Response({"message": "Profile fetched successfully.", "code": status.HTTP_200_OK, "data": out})
+    return Response({"message": "Profile fetched successfully.",
+                     "code": status.HTTP_200_OK,
+                     "data": out})
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
@@ -360,8 +364,7 @@ def profile_edit(request):
                 "message": "Validation errors.",
                 "code": status.HTTP_400_BAD_REQUEST,
                 "data": serializer.errors,
-            },
-            status=status.HTTP_400_BAD_REQUEST,
+            }
         )
 
     serializer.save()
