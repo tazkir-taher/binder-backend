@@ -8,7 +8,6 @@ class Dater(AbstractUser):
     class Gender(models.TextChoices):
         MALE   = 'male',   'Male'
         FEMALE = 'female', 'Female'
-        OTHER  = 'other',  'Other'
 
     INTERESTS = (
         ('singing', 'Singing'),
@@ -19,7 +18,7 @@ class Dater(AbstractUser):
     )
     email      = models.EmailField(unique=True)
     birth_date = models.DateField(null=True, blank=True)
-    gender     = models.CharField(max_length=10, choices=Gender.choices, default=Gender.OTHER)
+    gender     = models.CharField(max_length=10, choices=Gender.choices, default=Gender.FEMALE)
     
     location  = models.CharField(max_length=100, blank=True, null=True)
     height    = models.PositiveIntegerField(blank=True, null=True)
@@ -27,6 +26,8 @@ class Dater(AbstractUser):
     interests = models.CharField(max_length=200, choices=INTERESTS, null = True, blank = True)
     hobbies   = models.TextField(blank=True, null=True)
     photo     = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
+    is_deleted = models.BooleanField(default=False)
+
 
     USERNAME_FIELD  = 'email'
     REQUIRED_FIELDS = []
@@ -46,3 +47,8 @@ class Dater(AbstractUser):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} <{self.email}>"
+    
+class ProfilesHasOTP(models.Model):
+    user = models.ForeignKey(Dater, on_delete=models.CASCADE, related_name='profile_otp', null=True)
+    otp = models.CharField(max_length=6, null=True, unique=True)
+    verified = models.BooleanField(default=False)

@@ -29,3 +29,21 @@ class DaterSerializer(serializers.ModelSerializer):
         
     def get_age(self, obj):
         return obj.age
+    
+class ChangePasswordSerializer(serializers.ModelSerializer):
+    
+    new_password1 = serializers.CharField(required=True)
+    new_password2 = serializers.CharField(required=True)
+
+    class Meta:
+        model = Dater
+        fields = [ 'password', 'new_password1', 'new_password2']
+
+
+class ForgotPasswordSerializer(serializers.ModelSerializer):
+    new_password1 = serializers.CharField(required=True)
+    new_password2 = serializers.CharField(required=True)
+
+    class Meta:
+        model = Dater
+        fields = ['new_password1', 'new_password2']
