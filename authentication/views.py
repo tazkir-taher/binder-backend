@@ -111,7 +111,7 @@ def login_view(request):
     if not email or not password:
         return Response(
             {
-                "message": "Email and password are required. Offer both, or face the wrath of the digital underworld!",
+                "message": "Email and password are required.",
                 "code": status.HTTP_400_BAD_REQUEST
             }
         )
@@ -120,7 +120,7 @@ def login_view(request):
         user = User.objects.get(email__iexact=email)
     except User.DoesNotExist:
         return Response(
-            {"message": "Invalid credentials. This email doesn’t exist in our realm.", 
+            {"message": "Invalid credentials.", 
              "code": status.HTTP_401_UNAUTHORIZED}
         )
 
@@ -186,7 +186,7 @@ def logout_view(request):
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
-def changePassword(request):
+def change_Password(request):
     try:
         data = request.data
         user = request.user
@@ -219,7 +219,7 @@ def changePassword(request):
         )
 
 @api_view(['POST'])
-def checkUserProfileByEmail(request):
+def check_User_Profile_By_Email(request):
     try:
         data = request.data
         email = data.get('email')
@@ -249,7 +249,7 @@ def checkUserProfileByEmail(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def verifyOTP(request):
+def verify_OTP(request):
     try:
         user_id = request.data.get('user')
         user_instance = User.objects.get(id=user_id)
@@ -279,7 +279,7 @@ def verifyOTP(request):
                          "error": str(e)})
 
 @api_view(['POST'])
-def forgotPassword(request):
+def forgot_Password(request):
     serializer = ForgotPasswordSerializer(data=request.data)
     try:
         if serializer.is_valid():
