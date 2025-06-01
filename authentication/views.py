@@ -107,46 +107,57 @@ def register(request):
 def login_view(request):
     email = request.data.get('email')
     password = request.data.get('password')
+
     if not email or not password:
         return Response(
-            {"message": "Email and password are required.",
-             "code": status.HTTP_400_BAD_REQUEST}
+            {
+                "message": "Email and password are required. Offer both, or face the wrath of the digital underworld!",
+                "code": status.HTTP_400_BAD_REQUEST
+            }
         )
 
     try:
         user = User.objects.get(email__iexact=email)
     except User.DoesNotExist:
-        return Response({"message": "Invalid credentials.",
-                         "code": status.HTTP_401_UNAUTHORIZED})
+        return Response(
+            {"message": "Invalid credentials. This email doesn’t exist in our realm.", 
+             "code": status.HTTP_401_UNAUTHORIZED}
+        )
 
     if user.is_deleted:
         return Response(
             {
                 "message": "Your account has been deleted permanently. Please register again.",
-                "code": status.HTTP_403_FORBIDDEN,
-            }
-        )
-
-    if not user.is_active:
-        return Response(
-            {
-                "message": "Your account is currently deactivated. Do you want to reactivate it?",
-                "code": status.HTTP_403_FORBIDDEN,
+                "code": status.HTTP_403_FORBIDDEN
             }
         )
 
     if not user.check_password(password):
-        return Response({"message": "Invalid credentials.",
-                         "code": status.HTTP_401_UNAUTHORIZED})
+        return Response(
+            {"message": "Invalid credentials. The password is not correct.", 
+             "code": status.HTTP_401_UNAUTHORIZED}
+        )
+    
+    if not user.is_active:
+        user.is_active = True
+        user.save(update_fields=['is_active'])
+        refresh = RefreshToken.for_user(user)
+        tokens = {"refresh": str(refresh), "access": str(refresh.access_token)}
+        return Response(
+            {
+                "message": "Account reactivated! Welcome back!",
+                "code": status.HTTP_200_OK,
+                "data": {"tokens": tokens}
+            }
+        )
 
     refresh = RefreshToken.for_user(user)
-    tokens = {"refresh": str(refresh),
-              "access": str(refresh.access_token)}
+    tokens = {"refresh": str(refresh), "access": str(refresh.access_token)}
     return Response(
         {
             "message": "Login successful!",
             "code": status.HTTP_200_OK,
-            "data": {"tokens": tokens},
+            "data": {"tokens": tokens}
         }
     )
 
@@ -379,60 +390,6 @@ def profile_deactivate(request):
     user.save(update_fields=['is_active'])
     return Response({"message": "Account deactivated. GOOD BYE", 
                     "code": status.HTTP_200_OK})
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def profile_reactivate(request):
-    email = request.data.get('email')
-    password = request.data.get('password')
-    if not email or not password:
-        return Response(
-            {"message": "Email and password are required.",
-             "code": status.HTTP_400_BAD_REQUEST}
-        )
-
-    try:
-        user = User.objects.get(email__iexact=email)
-    except User.DoesNotExist:
-        return Response({"message": "Invalid credentials.",
-                         "code": status.HTTP_401_UNAUTHORIZED})
-
-    if user.is_deleted:
-        return Response(
-            {
-                "message": "Cannot reactivate. Your account was deleted. Please register again.",
-                "code": status.HTTP_403_FORBIDDEN,
-            }
-        )
-
-    if user.is_active and user.check_password(password):
-        refresh = RefreshToken.for_user(user)
-        tokens = {"refresh": str(refresh),
-                  "access": str(refresh.access_token)}
-        return Response(
-            {
-                "message": "Your account is already active. Logging you in.",
-                "code": status.HTTP_200_OK,
-                "data": {"tokens": tokens},
-            }
-        )
-
-    if not user.is_active and user.check_password(password):
-        user.is_active = True
-        user.save(update_fields=['is_active'])
-        refresh = RefreshToken.for_user(user)
-        tokens = {"refresh": str(refresh),
-                  "access": str(refresh.access_token)}
-        return Response(
-            {
-                "message": "Account reactivated! Welcome back to the realm of the living.",
-                "code": status.HTTP_200_OK,
-                "data": {"tokens": tokens},
-            }
-        )
-
-    return Response({"message": "Invalid credentials.",
-                     "code": status.HTTP_401_UNAUTHORIZED})
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
