@@ -41,9 +41,10 @@ class ChangePasswordSerializer(serializers.ModelSerializer):
 
 
 class ForgotPasswordSerializer(serializers.ModelSerializer):
+    email = serializers.CharField(required=True)
     new_password1 = serializers.CharField(required=True)
     new_password2 = serializers.CharField(required=True)
 
     class Meta:
         model = Dater
-        fields = ['new_password1', 'new_password2']
+        fields = ['email', 'new_password1', 'new_password2']

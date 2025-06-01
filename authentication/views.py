@@ -208,41 +208,6 @@ def changePassword(request):
         )
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def forgotPassword(request):
-    serializer = ForgotPasswordSerializer(data=request.data)
-
-    if serializer.is_valid():
-        new_password = serializer.validated_data.get('new_password1')
-        new_password2 = serializer.validated_data.get('new_password2')
-
-        if new_password != new_password2:
-            return Response(
-                {"response": "Passwords do not match.",
-                 "status": status.HTTP_400_BAD_REQUEST}
-            )
-
-        user = request.user
-
-        if not ProfilesHasOTP.objects.filter(user=user, verified=True).exists():
-            return Response(
-                {
-                    "response": "OTP not verified. Please verify OTP before resetting password.",
-                    "status": status.HTTP_400_BAD_REQUEST,
-                }
-            )
-
-        user.set_password(new_password2)
-        user.save(update_fields=['password'])
-
-        return Response({"response": "Password changed successfully.",
-                         "status": status.HTTP_200_OK})
-
-    return Response({"response": serializer.errors,
-                     "status": status.HTTP_400_BAD_REQUEST})
-
-
-@api_view(['POST'])
 def checkUserProfileByEmail(request):
     try:
         data = request.data
@@ -285,16 +250,10 @@ def verifyOTP(request):
                 latest_otp_record.verified = True
                 latest_otp_record.save()
 
-                refresh = RefreshToken.for_user(user_instance)
-                tokens = {
-                    'refresh': str(refresh),
-                    'access': str(refresh.access_token),
-                }
-
                 return Response(
                     {'code': status.HTTP_200_OK,
-                     'response': "OTP verified successfully",
-                     "data": {"tokens": tokens}}
+                     'response': "OTP verified successfully"
+                    }
                 )
             else:
                 return Response({'code': status.HTTP_400_BAD_REQUEST,
@@ -308,6 +267,57 @@ def verifyOTP(request):
                          'response': "Error in OTP verification",
                          "error": str(e)})
 
+@api_view(['POST'])
+def forgotPassword(request):
+    serializer = ForgotPasswordSerializer(data=request.data)
+    try:
+        if serializer.is_valid():
+            email = serializer.validated_data.get('email')
+            new_password = serializer.validated_data.get('new_password1')
+            new_password2 = serializer.validated_data.get('new_password2')
+
+            if new_password != new_password2:
+                return Response(
+                    {"response": "Passwords do not match.",
+                    "code": status.HTTP_400_BAD_REQUEST}
+                )
+
+            try:
+                account = User.objects.get(email=email)
+            except User.DoesNotExist:
+                return Response({"response": "No Profile Found",
+                                "code": status.HTTP_400_BAD_REQUEST})
+
+            if not ProfilesHasOTP.objects.filter(user=account, verified=True).exists():
+                return Response(
+                    {
+                        "response": "OTP not verified. Please verify OTP before resetting password.",
+                        "code": status.HTTP_400_BAD_REQUEST,
+                    }
+                )
+
+            account.set_password(new_password2)
+            account.save()
+
+            return Response({
+                "response": "Password reset successfully.",
+                'code': status.HTTP_200_OK,
+                'data': serializer.data
+            })
+
+        return Response({
+
+            "response": serializer.errors,
+            "code": status.HTTP_400_BAD_REQUEST
+
+        })
+
+    except Exception as e:
+        return Response({
+            'code': status.HTTP_400_BAD_REQUEST,
+            'response': "Data not Found",
+            'error': str(e)
+        })
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])

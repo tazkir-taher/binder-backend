@@ -36,6 +36,7 @@ def filter_by_date_range(queryset, date_field='created_on', start_date=None, end
     
     return queryset
 
+
 def generate_unique_numeric_otp(model_class):
     while True:
         

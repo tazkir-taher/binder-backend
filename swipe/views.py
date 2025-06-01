@@ -1,12 +1,15 @@
 from datetime import date
 from dateutil.relativedelta import relativedelta
+
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.authentication import JWTAuthentication
+
 from authentication.models import *
 from authentication.serializers import *
+
 from .models import *
 from .serializers import *
 
@@ -18,10 +21,8 @@ def feed(request):
 
     if swiper.gender == 'male':
         opposite = ['female']
-    elif swiper.gender == 'female':
-        opposite = ['male']
     else:
-        opposite = ['male', 'female', 'other']
+        opposite = ['male']
 
     seen_ids = Connection.objects.filter(sender=swiper).values_list('receiver_id', flat=True)
     candidates = Dater.objects.filter(gender__in=opposite).exclude(id__in=seen_ids).exclude(id=swiper.id)
@@ -38,27 +39,30 @@ def feed(request):
 def search(request):
     user = request.user
 
-    try:
-        conn_search = ConnectionSearch.objects.get(interest_filter=user)
-    except ConnectionSearch.DoesNotExist:
-        return Response({
-            "message": "ConnectionSearch not found for user.",
-            "code": 404
-        })
+    conn_search = ConnectionSearch.objects.filter(owner=user).first()
+    if not conn_search:
+        conn_search = ConnectionSearch.objects.create(owner=user)
+
 
     min_age_value = request.data.get("min_age")
     if min_age_value is not None:
         try:
             conn_search.min_age = int(min_age_value)
         except (ValueError, TypeError):
-            return Response({"message": "min_age must be an integer.", "code": 400})
+            return Response({
+                "message": "min_age must be an integer.",
+                "code": 400
+            })
 
     max_age_value = request.data.get("max_age")
     if max_age_value is not None:
         try:
             conn_search.max_age = int(max_age_value)
         except (ValueError, TypeError):
-            return Response({"message": "max_age must be an integer.", "code": 400})
+            return Response({
+                "message": "max_age must be an integer.",
+                "code": 400
+            })
 
     interest_filter_value = request.data.get("interest_filter")
     if interest_filter_value:
@@ -68,15 +72,20 @@ def search(request):
 
     candidates = Dater.objects.exclude(id=user.id)
 
-    today = date.today()
+    if user.gender == 'male':
+        opposites = ['female']
+    else:
+        opposites = ['male']
+    candidates = candidates.filter(gender__in=opposites)
 
+    today = date.today()
     if conn_search.max_age is not None:
-        max_bday_cutoff = today - relativedelta(years=conn_search.max_age)
-        candidates = candidates.filter(birth_date__gte=max_bday_cutoff)
+        cutoff_for_max = today - relativedelta(years=conn_search.max_age)
+        candidates = candidates.filter(birth_date__gte=cutoff_for_max)
 
     if conn_search.min_age is not None:
-        min_bday_cutoff = today - relativedelta(years=conn_search.min_age)
-        candidates = candidates.filter(birth_date__lte=min_bday_cutoff)
+        cutoff_for_min = today - relativedelta(years=conn_search.min_age)
+        candidates = candidates.filter(birth_date__lte=cutoff_for_min)
 
     if conn_search.interests:
         candidates = candidates.filter(interests=conn_search.interests)

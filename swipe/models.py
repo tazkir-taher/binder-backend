@@ -13,9 +13,10 @@ class Connection(models.Model):
         return f"{self.sender} → {self.receiver} | matched={self.matched}"
     
 class ConnectionSearch(models.Model):
-    interest_filter = models.OneToOneField(Dater, related_name='connection_search', on_delete=models.CASCADE)
+    owner = models.OneToOneField(Dater, related_name='connection_search', on_delete=models.CASCADE)
+    interests = models.CharField(max_length=200, blank=True)
     max_age = models.IntegerField(null=True, blank=True)
     min_age = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
-        return f"Search by {self.interest_filter.email}: ages {self.min_age}–{self.max_age}"
+        return f"Search by {self.owner.email}: ages {self.min_age}–{self.max_age}, interest={self.interests}"

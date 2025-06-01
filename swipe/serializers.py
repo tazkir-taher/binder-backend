@@ -9,9 +9,3 @@ class ConnectionSerializer(serializers.ModelSerializer):
         model = Connection
         fields = ['id', 'sender', 'receiver', 'matched']
         read_only_fields = ['id', 'matched']
-
-class ConnectionSearchSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = ConnectionSearch
-        fields = '__all__'
