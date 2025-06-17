@@ -89,30 +89,27 @@ def search(request):
         candidates = candidates.filter(birth_date__lte=cutoff_for_min)
     candidates = candidates.filter(birth_date__isnull=False)
 
-    raw_want = conn_search.interests
-    if isinstance(raw_want, list):
-        want = raw_want
-    elif isinstance(raw_want, str) and raw_want:
-        want = [i.strip() for i in raw_want.split(',')]
+    need = conn_search.interests
+    if isinstance(need, list):
+        want = need
+    elif isinstance(need, str) and need:
+        want = [i.strip() for i in need.split(',')]
     else:
         want = []
 
-    matched = []
+    similar = []
     for person in candidates:
-        # Normalize each person’s interests into a list
-        raw_has = person.interests
-        if isinstance(raw_has, list):
-            has = raw_has
-        elif isinstance(raw_has, str) and raw_has:
-            has = [i.strip() for i in raw_has.split(',')]
+        been = person.interests
+        if isinstance(been, list):
+            has = been
+        elif isinstance(been, str) and been:
+            has = [i.strip() for i in been.split(',')]
         else:
             has = []
-
-        # If any of the search interests appear in this person's interests, keep them
         if any(interest in has for interest in want):
-            matched.append(person)
+            similar.append(person)
 
-    candidates = matched
+    candidates = similar
 
     lock = request.data.get("lock") is True
     conn_search.lock = lock
