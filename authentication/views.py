@@ -7,6 +7,7 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.db import IntegrityError
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import check_password
 
 from rest_framework import status, serializers
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -138,6 +139,12 @@ def login_view(request):
              "code": status.HTTP_401_UNAUTHORIZED}
         )
     
+    out = DaterSerializer(user, context={'request': request}).data
+
+    refresh = RefreshToken.for_user(user)
+    tokens = {"refresh": str(refresh),
+              "access": str(refresh.access_token)}
+    
     if not user.is_active:
         user.is_active = True
         user.save(update_fields=['is_active'])
@@ -148,18 +155,21 @@ def login_view(request):
             {
                 "message": "Account reactivated! Welcome back!",
                 "code": status.HTTP_200_OK,
-                "data": {"tokens": tokens}
+                "data": {"tokens": tokens},
+                "user_data": out
             }
         )
 
     refresh = RefreshToken.for_user(user)
     tokens = {"refresh": str(refresh),
               "access": str(refresh.access_token)}
+    
     return Response(
         {
             "message": "Login successful!",
             "code": status.HTTP_200_OK,
-            "data": {"tokens": tokens}
+            "data": {"tokens": tokens},
+            "user_data": out
         }
     )
 
@@ -195,21 +205,30 @@ def change_Password(request):
         serializer = ChangePasswordSerializer(data=data)
 
         if serializer.is_valid():
-            password = serializer.data.get('new_password1')
-            password2 = serializer.data.get('new_password2')
-            if password != password2:
-                raise serializers.ValidationError({"password": "Passwords Must Match"})
+            if check_password(request.data['password'], user.password):
+                password = serializer.data.get('new_password1')
+                password2 = serializer.data.get('new_password2')
+                if password != password2:
+                    raise serializers.ValidationError({"password": "Passwords Must Match"})
 
-            user.set_password(password2)
-            user.save(update_fields=['password'])
+                user.set_password(password2)
+                user.save(update_fields=['password'])
 
-            return Response(
-                {
-                    "response": "Password updated successfully.",
-                    "code": status.HTTP_200_OK,
-                    "data": serializer.data,
-                }
-            )
+                return Response(
+                    {
+                        "response": "Password updated successfully.",
+                        "code": status.HTTP_200_OK,
+                        "data": serializer.data,
+                    }
+                )
+                
+            else:
+                return Response(
+                    {
+                        "response": "Wrong password",
+                        "code": status.HTTP_200_OK,
+                    }
+                )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -225,8 +244,15 @@ def check_User_Profile_By_Email(request):
     try:
         data = request.data
         email = data.get('email')
-
+        user = User.objects.get(email=email)
         try:
+            if user.is_deleted == True:
+                return Response(
+                {
+                    "response": "User Profile Deleted. Sorry",
+                    "status": status.HTTP_400_BAD_REQUEST
+                }
+            )
             user = User.objects.get(email=email)
             otp = generate_unique_numeric_otp(ProfilesHasOTP)
             ProfilesHasOTP.objects.create(user=user, otp=otp)
@@ -240,14 +266,14 @@ def check_User_Profile_By_Email(request):
                 }
             )
         except User.DoesNotExist:
-            return Response({"response": "No Profile Found", "status": 400})
+            return Response({"response": "No Profile Found",
+                             "status": status.HTTP_400_BAD_REQUEST})
     except Exception as e:
         return Response(
             {"code": status.HTTP_400_BAD_REQUEST,
              "response": "Data not Found",
              "error": str(e)}
         )
-
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -263,11 +289,16 @@ def verify_OTP(request):
                 latest_otp_record.verified = True
                 latest_otp_record.save()
 
+                if not user_instance.is_active:
+                    user_instance.is_active = True
+                    user_instance.save(update_fields=['is_active'])
+
                 return Response(
                     {'code': status.HTTP_200_OK,
                      'response': "OTP verified successfully"
                     }
                 )
+            
             else:
                 return Response({'code': status.HTTP_400_BAD_REQUEST,
                                  'response': "Invalid OTP"})
@@ -342,6 +373,32 @@ def profile_get(request):
                      "code": status.HTTP_200_OK,
                      "data": out})
 
+
+@api_view(['GET'])
+def images_get(request):
+    daters = Dater.objects.filter(is_deleted=False)
+    payload = []
+    for dater in daters:
+        images = {}
+        if dater.mandatory_image:
+            images['mandatory_image'] = request.build_absolute_uri(dater.mandatory_image.url)
+        optional_list = [
+            img.url for img in (
+                dater.optional_image1,
+                dater.optional_image2,
+                dater.optional_image3
+            ) if img
+        ]
+        if optional_list:
+            images['optional_images'] = [
+                request.build_absolute_uri(u) for u in optional_list
+            ]
+        payload.append({
+            'id': dater.id,
+            'images': images
+        })
+    return Response(payload)
+
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
@@ -349,70 +406,85 @@ def profile_edit(request):
     user = request.user
     data = request.data.copy()
 
-    if 'image' in data and data['image'] is not None:
-        fmt, img_str = str(data['image']).split(';base64,')
-        ext = fmt.split('/')[-1]
-        img_file = ContentFile(base64.b64decode(img_str), name='temp.' + ext)
-        data['image'] = img_file
-    else:
-        data.pop('photo', None)
+    image_fields = [
+        'mandatory_image',
+        'optional_image1',
+        'optional_image2',
+        'optional_image3',
+    ]
 
-    serializer = DaterSerializer(user, data=data, partial=True, context={'request': request})
+    for field in image_fields:
+        if field in data:
+            val = data[field]
+            if val is None:
+                data[field] = None
+            else:
+                try:
+                    fmt, img_str = str(val).split(';base64,')
+                    ext = fmt.split('/')[-1]
+                    img_file = ContentFile(
+                        base64.b64decode(img_str),
+                        name=f'{field}.{ext}'
+                    )
+                    data[field] = img_file
+                except ValueError:
+                    return Response({
+                        "message": f"Invalid data for {field}.",
+                        "code": status.HTTP_400_BAD_REQUEST,
+                        "data": {field: "Must be null or base64 string."},
+                    })
+                
+    serializer = DaterSerializer(
+        user,
+        data=data,
+        partial=True,
+        context={'request': request}
+    )
     if not serializer.is_valid():
-        return Response(
-            {
-                "message": "Validation errors.",
-                "code": status.HTTP_400_BAD_REQUEST,
-                "data": serializer.errors,
-            }
-        )
+        return Response({
+            "message": "Validation errors.",
+            "code": status.HTTP_400_BAD_REQUEST,
+            "data": serializer.errors,
+        })
 
     serializer.save()
-    edited_data = serializer.data
-
-    return Response({"message": "Profile updated successfully.",
-                     "code": status.HTTP_200_OK,
-                     "data": edited_data})
+    return Response({
+        "message": "Profile updated successfully.",
+        "code": status.HTTP_200_OK,
+        "data": serializer.data,
+    })
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def profile_deactivate(request):
     user = request.user
-    if user.is_deleted:
-        return Response(
-            {"message": "Cannot deactivate. Your account is already deleted.",
-             "code": status.HTTP_400_BAD_REQUEST}
-        )
-
-    if not user.is_active:
-        return Response({"message": "Your account is already deactivated.",
-                         "code": status.HTTP_200_OK})
-
-    user.is_active = False
-    user.save(update_fields=['is_active'])
-    return Response({"message": "Account deactivated. GOOD BYE", 
-                    "code": status.HTTP_200_OK})
+    if check_password(request.data['password'], user.password):
+        user.is_active = False
+        user.save(update_fields=['is_active'])
+        return Response({"message": "Account deactivated. GOOD BYE", 
+                        "code": status.HTTP_200_OK})
+    else:
+        return Response({"message": "Wrong Password", 
+                        "code": status.HTTP_400_BAD_REQUEST})
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def profile_delete(request):
     user = request.user
-    if user.is_deleted:
+    if check_password(request.data['password'], user.password):
+        user.is_deleted = True
+        user.is_active = False
+        user.save(update_fields=['is_deleted', 'is_active'])
         return Response(
-            {"message": "Your account is already deleted. Please register again if you want to return.", 
-             "code": status.HTTP_400_BAD_REQUEST}
+            {"message": "Account marked as deleted. GOOD BYE", 
+            "code": status.HTTP_200_OK}
         )
-
-    user.is_deleted = True
-    user.is_active = False
-    user.save(update_fields=['is_deleted', 'is_active'])
-    return Response(
-        {"message": "Account marked as deleted. GOOD BYE", 
-         "code": status.HTTP_200_OK}
-    )
-
+    else:
+        return Response({"message": "Wrong Password", 
+                        "code": status.HTTP_400_BAD_REQUEST})
+    
 @api_view(['GET'])
 def serve_media(request, path):
     if not default_storage.exists(path):
@@ -422,3 +494,21 @@ def serve_media(request, path):
     return FileResponse(
         file_handle, content_type=content_type or 'application/octet-stream', status=status.HTTP_200_OK
     )
+
+#test territory
+
+@api_view(['DELETE'])
+def dater_Delete(request, pk):
+    try:
+        user = Dater.objects.get(id= pk)
+        user.delete()
+        return Response({
+            'code': status.HTTP_200_OK,
+            'response': "Data Deleted"
+        })
+    except Exception as e:
+        return Response({
+            'code': status.HTTP_400_BAD_REQUEST,
+            'response': "Data not Found",
+            'error': str(e)
+        })

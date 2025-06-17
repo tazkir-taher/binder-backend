@@ -25,7 +25,7 @@ def feed(request):
         opposite = ['male']
 
     seen_ids = Connection.objects.filter(sender=swiper).values_list('receiver_id', flat=True)
-    candidates = Dater.objects.filter(gender__in=opposite).exclude(id__in=seen_ids).exclude(id=swiper.id)
+    candidates = Dater.objects.filter(gender__in=opposite).exclude(id__in=seen_ids).exclude(id=swiper.id).exclude(is_active = False)
 
     serializer = DaterSerializer(candidates, many=True, context={'request': request})
     return Response({
@@ -38,39 +38,39 @@ def feed(request):
 @permission_classes([IsAuthenticated])
 def search(request):
     user = request.user
-
     conn_search = ConnectionSearch.objects.filter(owner=user).first()
     if not conn_search:
         conn_search = ConnectionSearch.objects.create(owner=user)
-
+    
     min_age_value = request.data.get("min_age")
     if min_age_value is not None:
         try:
             conn_search.min_age = int(min_age_value)
         except (ValueError, TypeError):
-            return Response({
-                "message": "min_age must be an integer.",
-                "code": 400
-            })
-        
+            return Response({"message": "min_age must be an integer.",
+                              "code": 400})
+    conn_search.save()
+
     max_age_value = request.data.get("max_age")
     if max_age_value is not None:
         try:
             conn_search.max_age = int(max_age_value)
         except (ValueError, TypeError):
-            return Response({
-                "message": "max_age must be an integer.",
-                "code": 400
-            })
+            return Response({"message": "max_age must be an integer.",
+                             "code": 400})
+    conn_search.save()
 
     interest_filter_value = request.data.get("interest_filter")
     if interest_filter_value:
-        conn_search.interests = interest_filter_value
-
-    conn_search.save()
+        if isinstance(interest_filter_value, (list, tuple)):
+            conn_search.interests = ','.join(map(str, interest_filter_value))
+        else:
+            conn_search.interests = str(interest_filter_value)
+    else:
+        conn_search.interests = None
+    conn_search.save(update_fields=['interests'])
 
     candidates = Dater.objects.exclude(id=user.id)
-
     if user.gender == 'male':
         opposites = ['female']
     else:
@@ -78,25 +78,68 @@ def search(request):
     candidates = candidates.filter(gender__in=opposites)
 
     seen_ids = Connection.objects.filter(sender=user).values_list('receiver_id', flat=True)
-    candidates = candidates.exclude(id__in=seen_ids)
+    candidates = candidates.exclude(id__in=seen_ids).exclude(is_active=False)
 
     today = date.today()
     if conn_search.max_age is not None:
-        cutoff_for_max = today - relativedelta(years=conn_search.max_age)
+        cutoff_for_max = today - relativedelta(years=conn_search.max_age + 1)
         candidates = candidates.filter(birth_date__gte=cutoff_for_max)
-
     if conn_search.min_age is not None:
         cutoff_for_min = today - relativedelta(years=conn_search.min_age)
         candidates = candidates.filter(birth_date__lte=cutoff_for_min)
-
-    if conn_search.interests:
-        candidates = candidates.filter(interests=conn_search.interests)
-
     candidates = candidates.filter(birth_date__isnull=False)
+
+    raw_want = conn_search.interests
+    if isinstance(raw_want, list):
+        want = raw_want
+    elif isinstance(raw_want, str) and raw_want:
+        want = [i.strip() for i in raw_want.split(',')]
+    else:
+        want = []
+
+    matched = []
+    for person in candidates:
+        # Normalize each person’s interests into a list
+        raw_has = person.interests
+        if isinstance(raw_has, list):
+            has = raw_has
+        elif isinstance(raw_has, str) and raw_has:
+            has = [i.strip() for i in raw_has.split(',')]
+        else:
+            has = []
+
+        # If any of the search interests appear in this person's interests, keep them
+        if any(interest in has for interest in want):
+            matched.append(person)
+
+    candidates = matched
+
+    lock = request.data.get("lock") is True
+    conn_search.lock = lock
+    conn_search.save(update_fields=['lock'])
 
     serializer = DaterSerializer(candidates, many=True)
     return Response({
         "message": "Search results fetched successfully.",
+        "code": 200,
+        "data": serializer.data
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_search(request):
+    user = request.user
+    conn_search = ConnectionSearch.objects.filter(owner=user).first()
+
+    if not conn_search:
+        return Response({
+            "message": "No saved search preferences found.",
+            "code": 404
+        })
+
+    serializer = ConnectionSearchSerializer(conn_search)
+    return Response({
+        "message": "Search preferences retrieved successfully.",
         "code": 200,
         "data": serializer.data
     })
@@ -130,11 +173,12 @@ def swipe(request):
         })
 
     if not like:
+        Connection.objects.get_or_create(sender=swiper, receiver=receiver)
         matched = False
         return Response({
             "message": "Skipped.",
             "code": status.HTTP_200_OK,
-            "data": {"matched": matched, "receiver_name": receiver.first_name}
+            "data": {"matched": matched, "receiver_name": receiver.first_name, "receiver_id": receiver.id }
         })
 
     mutual = Connection.objects.filter(sender=receiver, receiver=swiper, matched=False).exists()
@@ -216,3 +260,67 @@ def match_detail(request, user_id):
         "code": status.HTTP_200_OK,
         "data": data
     })
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def like_detail(request, user_id):
+    user = request.user
+    liker_id = Connection.objects.filter(receiver=user, sender_id=user_id, matched=False).first()
+    if not liker_id:
+        return Response({
+            "message": "Did not like you.",
+            "code": status.HTTP_403_FORBIDDEN
+        })
+
+    try:
+        other = Dater.objects.get(id=user_id)
+    except Dater.DoesNotExist:
+        return Response({
+            "message": "User not found.",
+            "code": status.HTTP_404_NOT_FOUND
+        })
+
+    serializer = DaterSerializer(other, context={'request': request})
+    data = {
+        k: v for k, v in serializer.data.items()
+        if v not in (None, '', [], {})
+    }
+    return Response({
+        "message": "Like detail fetched successfully.",
+        "code": status.HTTP_200_OK,
+        "data": data
+    })
+
+#test stuff
+
+@api_view(['DELETE'])
+def connection_Delete(request, pk):
+    try:
+        conn = Connection.objects.get(id= pk)
+        conn.delete()
+        return Response({
+            'code': status.HTTP_200_OK,
+            'response': "Data Deleted"
+        })
+    except Exception as e:
+        return Response({
+            'code': status.HTTP_400_BAD_REQUEST,
+            'response': "Data not Found",
+            'error': str(e)
+        })
+
+@api_view(['DELETE'])
+def connection_Delete_all(request):
+    try:
+        Connection.objects.all().delete()
+        return Response({
+            'code': status.HTTP_200_OK,
+            'response': "All Data Deleted"
+        })
+    except Exception as e:
+        return Response({
+            'code': status.HTTP_400_BAD_REQUEST,
+            'response': "Data not Found",
+            'error': str(e)
+        })

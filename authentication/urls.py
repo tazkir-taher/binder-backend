@@ -10,7 +10,9 @@ urlpatterns = [
     path('check-user', check_User_Profile_By_Email, name = 'checky-by-email'),
     path('forgot-password/verify/otp', verify_OTP, name = 'verify-OTP'),
     path('profile', profile_get, name= 'profile'),
+    path('profile', images_get, name= 'profile'),
     path('profile/edit', profile_edit, name= 'profile-edit'),
-    path('deactivate/', profile_deactivate, name= 'profile-deactive'),
-    path('delete/', profile_delete, name= 'profile-deleted')
+    path('deactivate', profile_deactivate, name= 'profile-deactive'),
+    path('delete', profile_delete, name= 'profile-deleted'),
+    path('delete/<int:pk>', dater_Delete, name= 'dater-deleted')
 ]

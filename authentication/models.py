@@ -1,5 +1,6 @@
 from datetime import date
 from django.db import models
+from multiselectfield import MultiSelectField
 from django.contrib.auth.models import AbstractUser
 
 class Dater(AbstractUser):
@@ -23,9 +24,12 @@ class Dater(AbstractUser):
     location  = models.CharField(max_length=100, blank=True, null=True)
     height    = models.PositiveIntegerField(blank=True, null=True)
     bio       = models.TextField(blank=True, null=True)
-    interests = models.CharField(max_length=200, choices=INTERESTS, null = True, blank = True)
+    interests = MultiSelectField(choices=INTERESTS, blank=True, null=True)
     hobbies   = models.TextField(blank=True, null=True)
-    photo     = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
+    mandatory_image    = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
+    optional_image1    = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
+    optional_image2    = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
+    optional_image3    = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
     is_deleted = models.BooleanField(default=False)
 
 

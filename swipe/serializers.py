@@ -9,3 +9,13 @@ class ConnectionSerializer(serializers.ModelSerializer):
         model = Connection
         fields = ['id', 'sender', 'receiver', 'matched']
         read_only_fields = ['id', 'matched']
+
+class ConnectionSearchSerializer(serializers.ModelSerializer):
+    interests = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ConnectionSearch
+        fields = ['min_age', 'max_age', 'interests', 'lock']
+
+    def get_interests(self, obj):
+        return obj.interests.split(',') if obj.interests else []
