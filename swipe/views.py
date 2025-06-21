@@ -175,7 +175,9 @@ def swipe(request):
         return Response({
             "message": "Skipped.",
             "code": status.HTTP_200_OK,
-            "data": {"matched": matched, "receiver_name": receiver.first_name, "receiver_id": receiver.id }
+            "data": {"matched": matched,
+                     "receiver_name": receiver.first_name,
+                     "receiver_id": receiver.id }
         })
 
     mutual = Connection.objects.filter(sender=receiver, receiver=swiper, matched=False).exists()
@@ -210,7 +212,6 @@ def likes_received(request):
         "data": serializer.data
     })
 
-
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
@@ -218,8 +219,12 @@ def matches_list(request):
     user = request.user
     sent = Connection.objects.filter(sender=user, matched=True)
     received = Connection.objects.filter(receiver=user, matched=True)
-    matches = list(sent) + list(received)
-    serializer = ConnectionSerializer(matches, many=True, context={'request': request})
+
+    matches = [
+        conn.receiver if conn.sender == user else conn.sender
+        for conn in list(sent) + list(received)
+    ]
+    serializer = DaterSerializer(matches, many=True, context={'request': request})
     return Response({
         "message": "Matches fetched successfully.",
         "code": status.HTTP_200_OK,
@@ -230,28 +235,29 @@ def matches_list(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def match_detail(request, user_id):
-    user = request.user
-    as_sender = Connection.objects.filter(sender=user, receiver_id=user_id, matched=True).first()
-    as_receiver = Connection.objects.filter(sender_id=user_id, receiver=user, matched=True).first()
+    me = request.user
+
+    as_sender = Connection.objects.filter(sender=me, receiver_id=user_id, matched=True).first()
+    as_receiver = Connection.objects.filter(sender_id=user_id, receiver=me, matched=True).first()
     if not (as_sender or as_receiver):
         return Response({
             "message": "Not a mutual match.",
             "code": status.HTTP_403_FORBIDDEN
-        })
+        }, status=status.HTTP_403_FORBIDDEN)
 
-    try:
-        other = Dater.objects.get(id=user_id)
-    except Dater.DoesNotExist:
-        return Response({
-            "message": "User not found.",
-            "code": status.HTTP_404_NOT_FOUND
-        })
+    conn = as_sender if as_sender else as_receiver
+
+    if conn.sender == me:
+        other = conn.receiver
+    else:
+        other = conn.sender
 
     serializer = DaterSerializer(other, context={'request': request})
     data = {
         k: v for k, v in serializer.data.items()
         if v not in (None, '', [], {})
     }
+
     return Response({
         "message": "Match detail fetched successfully.",
         "code": status.HTTP_200_OK,
@@ -261,32 +267,48 @@ def match_detail(request, user_id):
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
+def liked_list(request):
+    me = request.user
+    conns = Connection.objects.filter(
+        receiver=me,
+        matched=False
+    )
+
+    admirers = [conn.sender for conn in conns]
+
+    serializer = DaterSerializer(admirers, many=True, context={'request': request})
+    return Response({
+        "message": "People who liked you fetched successfully.",
+        "code": status.HTTP_200_OK,
+        "data": serializer.data
+    })
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
 def like_detail(request, user_id):
-    user = request.user
-    liker_id = Connection.objects.filter(receiver=user, sender_id=user_id, matched=False).first()
-    if not liker_id:
+    me = request.user
+    conn = Connection.objects.filter(
+        sender_id=user_id,
+        receiver=me,
+        matched=False
+    ).first()
+
+    if not conn:
         return Response({
             "message": "Did not like you.",
             "code": status.HTTP_403_FORBIDDEN
-        })
+        }, status=status.HTTP_403_FORBIDDEN)
 
-    try:
-        other = Dater.objects.get(id=user_id)
-    except Dater.DoesNotExist:
-        return Response({
-            "message": "User not found.",
-            "code": status.HTTP_404_NOT_FOUND
-        })
+    other = conn.sender
 
     serializer = DaterSerializer(other, context={'request': request})
-    data = {
-        k: v for k, v in serializer.data.items()
-        if v not in (None, '', [], {})
-    }
+    cleaned = {k: v for k, v in serializer.data.items() if v not in (None, '', [], {})}
+
     return Response({
         "message": "Like detail fetched successfully.",
         "code": status.HTTP_200_OK,
-        "data": data
+        "data": cleaned
     })
 
 #test stuff

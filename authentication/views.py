@@ -121,7 +121,7 @@ def login_view(request):
         user = User.objects.get(email__iexact=email)
     except User.DoesNotExist:
         return Response(
-            {"message": "Invalid credentials.", 
+            {"message": "The user does not exist.", 
              "code": status.HTTP_401_UNAUTHORIZED}
         )
 
@@ -135,7 +135,7 @@ def login_view(request):
 
     if not user.check_password(password):
         return Response(
-            {"message": "Invalid credentials. The password is not correct.", 
+            {"message": "Your email or password is incorrect. Please try again.", 
              "code": status.HTTP_401_UNAUTHORIZED}
         )
     
@@ -372,7 +372,6 @@ def profile_get(request):
     return Response({"message": "Profile fetched successfully.",
                      "code": status.HTTP_200_OK,
                      "data": out})
-
 
 @api_view(['GET'])
 def images_get(request):
