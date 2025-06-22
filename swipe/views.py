@@ -269,10 +269,7 @@ def match_detail(request, user_id):
 @permission_classes([IsAuthenticated])
 def liked_list(request):
     me = request.user
-    conns = Connection.objects.filter(
-        receiver=me,
-        matched=False
-    )
+    conns = Connection.objects.filter(receiver=me,matched=False)
 
     admirers = [conn.sender for conn in conns]
 
@@ -288,11 +285,7 @@ def liked_list(request):
 @permission_classes([IsAuthenticated])
 def like_detail(request, user_id):
     me = request.user
-    conn = Connection.objects.filter(
-        sender_id=user_id,
-        receiver=me,
-        matched=False
-    ).first()
+    conn = Connection.objects.filter(sender_id=user_id,receiver=me,matched=False).first()
 
     if not conn:
         return Response({
