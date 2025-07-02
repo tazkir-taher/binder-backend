@@ -1,0 +1,27 @@
+@api_view(['POST'])
+def search_feed(request):
+    qs = Project.objects.all()
+
+    def parse(key):
+        v = request.data.get(key)
+        if not v:
+            return None
+        try:
+            return datetime.fromisoformat(v).date()
+        except:
+            return None
+
+    for f in ('birth_date'):
+        exact = parse(f)
+        if exact:
+            qs = qs.filter(**{f: exact})
+        start = parse(f + '_from')
+        end   = parse(f + '_to')
+        if start:
+            qs = qs.filter(**{f + '__gte': start})
+        if end:
+            qs = qs.filter(**{f + '__lte': end})
+
+    intrst = request.data.get('interests')
+    if ps:
+        qs = qs.filter(project_status=intrst)

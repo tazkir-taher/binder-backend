@@ -1,23 +1,13 @@
 from django.db import models
-from django.conf import settings
-
+from django.core.exceptions import ValidationError
+from authentication.models import Dater
+from swipe.models import Connection
 class Message(models.Model):
-    sender    = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='messages_sent'
-    )
-    recipient = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='messages_received'
-    )
-    content   = models.TextField()
+    sender = models.ForeignKey(Dater, on_delete=models.CASCADE, related_name="sent_messages")
+    receiver = models.ForeignKey(Dater, on_delete=models.CASCADE, related_name="received_messages")
+    content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
-    read      = models.BooleanField(default=False)
 
-    class Meta:
-        ordering = ['-timestamp']
-
-    def __str__(self):
-        return f"From {self.sender} to {self.recipient} at {self.timestamp}"
+    def clean(self):
+        if not Connection.is__matched(self.sender, self.receiver):
+            raise ValidationError("Users are not matched.")
